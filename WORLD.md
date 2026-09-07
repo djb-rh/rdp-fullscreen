@@ -1261,3 +1261,11 @@ So the shape fits and the position does not. Worth re-testing properly if drone
 work starts: check whether the records cluster along the racing line *in order*,
 rather than testing polygon containment, which is sensitive to how the road
 polygons were reconstructed.
+
+**Resolved (2026-09-06): the +0x004 block is the ROAD SEGMENT table**, not a
+drone path - position/elevation/pitch matrix/links/ownership ranges, streamed to
+the DSP32C because the DSP32C is the physics processor (see NOTES.md).  The 3%
+containment was the transposed x/z.  So the drone recordings live somewhere
+else, almost certainly the 1 MB main CPU ROM; the way in is the mover block the
+68010 rebuilds at 0x809400 (routine 0x021B88, position via 0x2162A): tap the
+writes, follow the mover state back to the ROM table it is replayed from.
