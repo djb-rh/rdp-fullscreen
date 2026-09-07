@@ -1295,3 +1295,48 @@ experiments/lua/); see experiments/README.md.  The root holds the patcher
 (apply_patch.py + the patch_*/mkseg/layout/world modules), the layout JSONs,
 rd.lua and the notes.  The directory is a git repo now; .gitignore whitelists
 code, JSON and notes only, so no ROM-derived file can be committed by accident.
+
+## Phase 0 (2026-09-06): rdtrack/ library and the parts measurement
+
+**rdtrack/dsk.py** parses the DSK image into dicts and re-encodes every
+structure to the bytes it came from (114 structures, 0 mismatches on stock;
+85.5% of the ROM accounted for, the rest being small per-track blocks and the
+padding).  Two corrections to WORLD.md fell out of the pointer map:
+
+* The track table is **three 164-byte (0xA4) records**, not two of 328:
+  0x000 speed/stunt (world A), **0x0A4 autocross**, 0x148 super stunt (world
+  B).  Route A's first node at 0x1EC sits inside the supposed 328-byte record
+  1, which is what gave it away.  Autocross has its own small world: 52
+  placements at 0x0B58A in ONE cell (descriptor 0x0BFE4, grid 0x0BFF2), 49
+  segments at 0x0C078 (start 32), one route used twice, names "AUTOCROSS" /
+  "For the fastest laps, enter the turns at the red cones,".  That region is
+  what the east-loop build overwrote when track 0's array grew (hence
+  "autocross record repointed").
+* Each record's +0x80 points at a **768-byte block**; the three sit at
+  0x1B744 / 0x1BA44 / 0x1BD44 and end exactly at the checksum byte 0x1C044.
+  Contents unknown (opaque in the round trip; candidates for R4).
+* Descriptor words +6/+8 are 0x70/0x70 for the 4x4 worlds and 0x1C/0x1C for
+  the one-cell autocross world: cell strides (4 x 28), so the grid shape is
+  data, not fixed at 4x4.
+
+Still opaque, all referenced from the track records: +0x14 -> 0x00560 (shared
+by all three), +0x18/+0x1C (0x00566, 0x0069A, 0x00988/0x00A00), +0x90 (0x00B0C
+/ 0x00B5C / 0x00BAC), +0x98, +0x9C, +0xA0 - a ~2.7 KB soup between the route
+nodes and the placements.  Phase 1's round trip will say which of them care
+about geometry.
+
+**rdtrack/parts.py -> parts.json** measures every road piece from the object
+ROM: the asphalt is a strip of slabs in colours 40 and 38, and **colour 58 is
+the centre-line paint** - its dashes give a direction field, the slab edges
+running across it are the cross-sections, their midpoints the centreline.
+33 pieces measured (entry/exit pose in model coordinates, width, chord, turn,
+length, elevation profile, bank per section, circle fit, name-decoded design).
+Findings: the design geometry decodes from the names exactly (C4512 = 45 deg
+R 120 ft, chord 3673.8 measured 3672.6); the END CROSS-SECTIONS of some pieces
+are skewed up to 1 deg from the design tangent (C3048 -0.97, C4572 -0.76,
+D10R1833 +0.38) - the model is the truth for butt joints, the closure solver
+absorbs the drift; MR4512/ML4512 are separate right/left models of C4512 with
+slightly different vertices; banked pieces (BANK 90 deg, BANKED1 180 deg
+hairpin) lift the outer edge so their plan view is not circular; SWEEPER is
+the unbanked BANK.  Stunt pieces (RAMP1, HLOOP, LAUNCH, JPART, JLAND, TUBE,
+CORKS) are classed but not yet measured meaningfully; CHKPT is the gate arch.

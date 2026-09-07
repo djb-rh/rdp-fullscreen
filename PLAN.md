@@ -77,15 +77,15 @@ VIR.md the earlier world/map work.  This file is the roadmap.
 |---|----------|----------------|--------|
 | R1 | What else references world A besides the three track records: attract-mode demo (recorded inputs?), "BEAT x:xx" default times, speed/stunt junction logic, pit/start scenery | whole-world replacement must not break the front end | disassembly around the track records; taps on 0x900D54 and the route walker while attract runs |
 | R2 | DSP32C segment-table capacity (its copy at 0x614000, 64 B/record) | hard ceiling on segments per world | DSP RAM map from the schematic/MAME; upload loop in the 68010 |
-| R3 | Cell grid bounds and how a placement is binned into the 16 cells | defines the drawable world and the cell-list writer | the 16 cell headers at 0x037C2 vs. stock placements |
+| R3 | Cell grid bounds and how a placement is binned into the cells (grid shape is data: 4x4 for A/B, 1 cell for autocross) | defines the drawable world and the cell-list writer | the cell headers vs. stock placements |
 | R4 | Drone path table: where, format, size per lap, how replay deviates | new tracks need new drones; budget | write-tap the mover block at 0x809400 (0x021B88 / 0x2162A), follow state to ROM |
-| R5 | Every road piece's true geometry incl. C4512/C4532, lane counts, catalogue radius | the parts library must be complete and trustworthy | measure end cross-sections from the object ROM by tool, not by hand |
+| R5 | ~~Every road piece's true geometry~~ DONE (rdtrack/parts.py -> parts.json); stunt pieces still need a 3D treatment | the parts library must be complete and trustworthy | measured from the object ROM by tool |
 | R6 | Terrain/horizon/sky and the ground colour outside placements | what a blank world looks like | placement-free build and look |
 | R7 | Track-select strings and any per-track text in the main ROM | optional renaming of slots | string search |
 
 ## Phases
 
-### Phase 0 - the library (rdtrack/)
+### Phase 0 - the library (rdtrack/)  [started 2026-09-06: dsk.py round-trips stock, parts.json written]
 Deliverable: a Python package that reads and writes every DSK structure above,
 proven by a **byte-identical round trip of both stock worlds**, plus a parts
 library generated from the object ROM (`parts.json`: entry/exit poses, hands,
