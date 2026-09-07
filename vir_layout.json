@@ -1,0 +1,372 @@
+{
+ "VIRROAD00": {
+  "index": 2,
+  "addr": 73818,
+  "radius": 7940
+ },
+ "VIRROAD01": {
+  "index": 4,
+  "addr": 119144,
+  "radius": 11410
+ },
+ "VIRROAD02": {
+  "index": 9,
+  "addr": 120016,
+  "radius": 10169
+ },
+ "VIRROAD03": {
+  "index": 28,
+  "addr": 118296,
+  "radius": 11166
+ },
+ "VIRROAD04": {
+  "index": 35,
+  "addr": 56488,
+  "radius": 9816
+ },
+ "VIRROAD05": {
+  "index": 36,
+  "addr": 57560,
+  "radius": 11584
+ },
+ "VIRROAD06": {
+  "index": 41,
+  "addr": 70984,
+  "radius": 11991
+ },
+ "VIRROAD07": {
+  "index": 45,
+  "addr": 58984,
+  "radius": 11822
+ },
+ "VIRROAD08": {
+  "index": 46,
+  "addr": 74384,
+  "radius": 11801
+ },
+ "VIRROAD09": {
+  "index": 48,
+  "addr": 112704,
+  "radius": 11830
+ },
+ "VIRROAD10": {
+  "index": 61,
+  "addr": 113680,
+  "radius": 11648
+ },
+ "VIRROAD11": {
+  "index": 62,
+  "addr": 108304,
+  "radius": 11466
+ },
+ "VIRROAD12": {
+  "index": 63,
+  "addr": 108838,
+  "radius": 11553
+ },
+ "VIRROAD13": {
+  "index": 64,
+  "addr": 107072,
+  "radius": 8045
+ },
+ "VIRROAD14": {
+  "index": 65,
+  "addr": 107606,
+  "radius": 10594
+ },
+ "VIRROAD15": {
+  "index": 69,
+  "addr": 95808,
+  "radius": 10554
+ },
+ "VIRROAD16": {
+  "index": 88,
+  "addr": 96342,
+  "radius": 10896
+ },
+ "VIRROAD17": {
+  "index": 92,
+  "addr": 96876,
+  "radius": 11107
+ },
+ "VIRROAD18": {
+  "index": 98,
+  "addr": 114656,
+  "radius": 11163
+ },
+ "VIRROAD19": {
+  "index": 99,
+  "addr": 115190,
+  "radius": 11160
+ },
+ "VIRROAD20": {
+  "index": 102,
+  "addr": 115724,
+  "radius": 10487
+ },
+ "VIRROAD21": {
+  "index": 103,
+  "addr": 116258,
+  "radius": 10910
+ },
+ "VIRROAD22": {
+  "index": 104,
+  "addr": 116792,
+  "radius": 10939
+ },
+ "VIRROAD23": {
+  "index": 105,
+  "addr": 117326,
+  "radius": 11446
+ },
+ "VIRROAD24": {
+  "index": 106,
+  "addr": 66408,
+  "radius": 10208
+ },
+ "VIRROAD25": {
+  "index": 111,
+  "addr": 66942,
+  "radius": 10894
+ },
+ "VIRROAD26": {
+  "index": 114,
+  "addr": 67476,
+  "radius": 11284
+ },
+ "VIRROAD27": {
+  "index": 115,
+  "addr": 68010,
+  "radius": 11882
+ },
+ "VIRROAD28": {
+  "index": 125,
+  "addr": 68544,
+  "radius": 11845
+ },
+ "VIRROAD29": {
+  "index": 153,
+  "addr": 61528,
+  "radius": 3157
+ },
+ "OAKTREE": {
+  "index": 154,
+  "addr": 92488,
+  "radius": 2573
+ },
+ "BRIDGE": {
+  "index": 155,
+  "addr": 109576,
+  "radius": 1727
+ },
+ "PITLANE00": {
+  "index": 156,
+  "addr": 97736,
+  "radius": 18080
+ },
+ "PITLANE01": {
+  "index": 157,
+  "addr": 94466,
+  "radius": 18612
+ },
+ "PITWALL00": {
+  "index": 158,
+  "addr": 71688,
+  "radius": 17277
+ },
+ "PITWALL01": {
+  "index": 159,
+  "addr": 59840,
+  "radius": 12108
+ },
+ "BLDG04": {
+  "index": 160,
+  "addr": 110768,
+  "radius": 2082
+ },
+ "BLDG05": {
+  "index": 161,
+  "addr": 57022,
+  "radius": 1661
+ },
+ "BLDG06": {
+  "index": 162,
+  "addr": 61250,
+  "radius": 4050
+ },
+ "BLDG07": {
+  "index": 163,
+  "addr": 58094,
+  "radius": 5697
+ },
+ "BLDG08": {
+  "index": 164,
+  "addr": 110496,
+  "radius": 2680
+ },
+ "BLDG09": {
+  "index": 165,
+  "addr": 108140,
+  "radius": 1272
+ },
+ "BLDG10": {
+  "index": 166,
+  "addr": 71518,
+  "radius": 1349
+ },
+ "BLDG11": {
+  "index": 167,
+  "addr": 118968,
+  "radius": 2554
+ },
+ "BLDG12": {
+  "index": 168,
+  "addr": 119712,
+  "radius": 3643
+ },
+ "BLDG13": {
+  "index": 169,
+  "addr": 59518,
+  "radius": 1456
+ },
+ "BLDG14": {
+  "index": 170,
+  "addr": 111192,
+  "radius": 1340
+ },
+ "BLDG15": {
+  "index": 171,
+  "addr": 110314,
+  "radius": 3786
+ },
+ "BLDG16": {
+  "index": 172,
+  "addr": 112504,
+  "radius": 1599
+ },
+ "BLDG17": {
+  "index": 173,
+  "addr": 111392,
+  "radius": 3776
+ },
+ "BLDG18": {
+  "index": 174,
+  "addr": 111816,
+  "radius": 1588
+ },
+ "BLDG19": {
+  "index": 175,
+  "addr": 74918,
+  "radius": 3193
+ },
+ "FENCE20_00": {
+  "index": 176,
+  "addr": 69078,
+  "radius": 15019
+ },
+ "FENCE21_00": {
+  "index": 177,
+  "addr": 58896,
+  "radius": 2642
+ },
+ "FENCE22_00": {
+  "index": 178,
+  "addr": 58632,
+  "radius": 10186
+ },
+ "FENCE23_00": {
+  "index": 179,
+  "addr": 109372,
+  "radius": 1372
+ },
+ "FENCE24_00": {
+  "index": 180,
+  "addr": 117880,
+  "radius": 10911
+ },
+ "FENCE25_00": {
+  "index": 181,
+  "addr": 70512,
+  "radius": 9647
+ },
+ "FENCE26_00": {
+  "index": 182,
+  "addr": 111088,
+  "radius": 1218
+ },
+ "FENCE27_00": {
+  "index": 183,
+  "addr": 111720,
+  "radius": 2310
+ },
+ "FENCE28_00": {
+  "index": 184,
+  "addr": 59696,
+  "radius": 5590
+ },
+ "FENCE29_00": {
+  "index": 185,
+  "addr": 113238,
+  "radius": 18648
+ },
+ "FENCE29_01": {
+  "index": 186,
+  "addr": 120782,
+  "radius": 784
+ },
+ "FENCE31_00": {
+  "index": 187,
+  "addr": 114214,
+  "radius": 18739
+ },
+ "FENCE32_00": {
+  "index": 188,
+  "addr": 111962,
+  "radius": 5853
+ },
+ "FENCE34_00": {
+  "index": 189,
+  "addr": 69556,
+  "radius": 23564
+ },
+ "FENCE34_01": {
+  "index": 190,
+  "addr": 120584,
+  "radius": 9780
+ },
+ "FENCE36_00": {
+  "index": 191,
+  "addr": 110920,
+  "radius": 822
+ },
+ "FENCE37_00": {
+  "index": 192,
+  "addr": 70034,
+  "radius": 22568
+ },
+ "FENCE37_01": {
+  "index": 193,
+  "addr": 57176,
+  "radius": 17681
+ },
+ "FENCE37_02": {
+  "index": 194,
+  "addr": 95368,
+  "radius": 19846
+ },
+ "FENCE40_00": {
+  "index": 195,
+  "addr": 112144,
+  "radius": 7966
+ },
+ "FENCE41_00": {
+  "index": 196,
+  "addr": 58248,
+  "radius": 18753
+ },
+ "FENCE43_00": {
+  "index": 197,
+  "addr": 97410,
+  "radius": 7948
+ }
+}

@@ -1,0 +1,254 @@
+{
+ "ROAD1": {
+  "chord": 1601,
+  "mid": [
+   0,
+   0
+  ],
+  "chord_dir": 0.0,
+  "turn": 0,
+  "entry": [
+   0,
+   -800.5
+  ],
+  "exit": [
+   0,
+   800.5
+  ],
+  "source": "model z-extent"
+ },
+ "ROAD2": {
+  "chord": 1601,
+  "mid": [
+   0,
+   0
+  ],
+  "chord_dir": 0.0,
+  "turn": 0,
+  "entry": [
+   0,
+   -800.5
+  ],
+  "exit": [
+   0,
+   800.5
+  ],
+  "source": "model z-extent"
+ },
+ "ROAD3": {
+  "chord": 5057,
+  "mid": [
+   0,
+   32
+  ],
+  "chord_dir": 0.0,
+  "turn": 0,
+  "entry": [
+   0,
+   -2528.5
+  ],
+  "exit": [
+   0,
+   2528.5
+  ],
+  "source": "model z-extent"
+ },
+ "DOTLINE": {
+  "chord": 19201,
+  "mid": [
+   0,
+   -8
+  ],
+  "chord_dir": 0.0,
+  "turn": 0,
+  "entry": [
+   0,
+   -9600.5
+  ],
+  "exit": [
+   0,
+   9600.5
+  ],
+  "source": "model z-extent"
+ },
+ "DOTLHALF": {
+  "chord": 9601,
+  "mid": [
+   0,
+   -2
+  ],
+  "chord_dir": 0.0,
+  "turn": 0,
+  "entry": [
+   0,
+   -4800.5
+  ],
+  "exit": [
+   0,
+   4800.5
+  ],
+  "source": "model z-extent"
+ },
+ "D30R917": {
+  "chord": 18987.0,
+  "mid": [
+   1249.8,
+   0.0
+  ],
+  "chord_dir": 0.0,
+  "turn": 30,
+  "entry": [
+   1249.8,
+   -9493.5
+  ],
+  "exit": [
+   1249.8,
+   9493.5
+  ],
+  "source": "full arc, 30 deg R=917 ft, from the piece name"
+ },
+ "D10R1833": {
+  "chord": 12780.5,
+  "mid": [
+   279.0,
+   0.0
+  ],
+  "chord_dir": 0.0,
+  "turn": 10,
+  "entry": [
+   279.0,
+   -6390.3
+  ],
+  "exit": [
+   279.0,
+   6390.3
+  ],
+  "source": "full arc, 10 deg R=1833 ft, from the piece name"
+ },
+ "C4532": {
+  "chord": 9522,
+  "mid": [
+   -10969,
+   4648
+  ],
+  "chord_dir": 12.52,
+  "turn": 45,
+  "entry": [
+   -12001,
+   0
+  ],
+  "exit": [
+   -9937,
+   9296
+  ],
+  "source": "measured; name-decode not corroborated by model width"
+ },
+ "C3048": {
+  "chord": 9938.7,
+  "mid": [
+   654.2,
+   0.0
+  ],
+  "chord_dir": 0.0,
+  "turn": 30,
+  "entry": [
+   654.2,
+   -4969.3
+  ],
+  "exit": [
+   654.2,
+   4969.3
+  ],
+  "source": "full arc, 30 deg R=480 ft, from the piece name"
+ },
+ "C4572": {
+  "chord": 22042.6,
+  "mid": [
+   2192.3,
+   0.0
+  ],
+  "chord_dir": 0.0,
+  "turn": 45,
+  "entry": [
+   2192.3,
+   -11021.3
+  ],
+  "exit": [
+   2192.3,
+   11021.3
+  ],
+  "source": "full arc, 45 deg R=720 ft, from the piece name"
+ },
+ "C3060": {
+  "chord": 12423.3,
+  "mid": [
+   817.8,
+   0.0
+  ],
+  "chord_dir": 0.0,
+  "turn": 30,
+  "entry": [
+   817.8,
+   -6211.7
+  ],
+  "exit": [
+   817.8,
+   6211.7
+  ],
+  "source": "full arc, 30 deg R=600 ft, from the piece name"
+ },
+ "C4512": {
+  "chord": 3952,
+  "mid": [
+   -3977,
+   1976
+  ],
+  "chord_dir": 0.7,
+  "turn": 45,
+  "entry": [
+   -4001,
+   0
+  ],
+  "exit": [
+   -3953,
+   3952
+  ],
+  "source": "measured; name-decode not corroborated by model width"
+ },
+ "OVERP": {
+  "chord": 19201,
+  "mid": [
+   0,
+   -58
+  ],
+  "chord_dir": 0.0,
+  "turn": 0,
+  "entry": [
+   0,
+   -9600.5
+  ],
+  "exit": [
+   0,
+   9600.5
+  ],
+  "source": "model z-extent"
+ },
+ "UNDERP": {
+  "chord": 19201,
+  "mid": [
+   -0.5,
+   0
+  ],
+  "chord_dir": 0.0,
+  "turn": 0,
+  "entry": [
+   -0.5,
+   -9600.5
+  ],
+  "exit": [
+   -0.5,
+   9600.5
+  ],
+  "source": "model z-extent; lateral from the road faces' centre"
+ }
+}

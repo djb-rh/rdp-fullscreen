@@ -1,0 +1,121 @@
+{
+ "D30R917": {
+  "turn": 30,
+  "radius_ft": 917,
+  "chord": 19393,
+  "rise": 0,
+  "len_ft": 485
+ },
+ "D10R1833": {
+  "turn": 10,
+  "radius_ft": 1833,
+  "chord": 12929,
+  "rise": 0,
+  "len_ft": 323
+ },
+ "C4532": {
+  "turn": 45,
+  "radius_ft": 320,
+  "chord": 9616,
+  "rise": 0,
+  "len_ft": 240
+ },
+ "C3048": {
+  "turn": 30,
+  "radius_ft": 480,
+  "chord": 10369,
+  "rise": 0,
+  "len_ft": 259
+ },
+ "C4572": {
+  "turn": 45,
+  "radius_ft": 720,
+  "chord": 22689,
+  "rise": 0,
+  "len_ft": 567
+ },
+ "C3060": {
+  "turn": 30,
+  "radius_ft": 600,
+  "chord": 12865,
+  "rise": 0,
+  "len_ft": 322
+ },
+ "C4512": {
+  "turn": 45,
+  "radius_ft": 120,
+  "chord": 3952,
+  "rise": 0,
+  "len_ft": 99
+ },
+ "ROAD1": {
+  "turn": 0,
+  "radius_ft": null,
+  "chord": 1601,
+  "rise": 0,
+  "len_ft": 40
+ },
+ "ROAD2": {
+  "turn": 0,
+  "radius_ft": null,
+  "chord": 1601,
+  "rise": 0,
+  "len_ft": 40
+ },
+ "ROAD3": {
+  "turn": 0,
+  "radius_ft": null,
+  "chord": 5057,
+  "rise": 0,
+  "len_ft": 126
+ },
+ "DOTLINE": {
+  "turn": 0,
+  "radius_ft": null,
+  "chord": 19201,
+  "rise": 208,
+  "len_ft": 480
+ },
+ "DOTLHALF": {
+  "turn": 0,
+  "radius_ft": null,
+  "chord": 9601,
+  "rise": 208,
+  "len_ft": 240
+ },
+ "STREET": {
+  "turn": 0,
+  "radius_ft": null,
+  "chord": 1641,
+  "rise": 0,
+  "len_ft": 41
+ },
+ "OVERP": {
+  "turn": 0,
+  "radius_ft": null,
+  "chord": 19201,
+  "rise": 800,
+  "len_ft": 480
+ },
+ "UNDERP": {
+  "turn": 0,
+  "radius_ft": null,
+  "chord": 19201,
+  "rise": 721,
+  "len_ft": 480
+ },
+ "EZJUMP": {
+  "turn": 0,
+  "radius_ft": null,
+  "chord": 19201,
+  "rise": 1216,
+  "len_ft": 480
+ },
+ "SWEEPER": {
+  "turn": 40,
+  "radius_ft": null,
+  "chord": 10401,
+  "rise": 0,
+  "len_ft": 260
+ }
+}

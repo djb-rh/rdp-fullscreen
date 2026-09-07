@@ -1,0 +1,92 @@
+[
+ {
+  "value": 200,
+  "marker": 4096,
+  "name": "start/finish straight"
+ },
+ {
+  "value": 202,
+  "marker": 32768,
+  "name": "Virginia International Raceway"
+ },
+ {
+  "value": 221,
+  "marker": 16384,
+  "name": "Horseshoe"
+ },
+ {
+  "value": 187,
+  "marker": 32768,
+  "name": "Virginia International Raceway"
+ },
+ {
+  "value": 64,
+  "marker": 16384,
+  "name": "NASCAR Bend"
+ },
+ {
+  "value": 129,
+  "marker": 32768,
+  "name": "Virginia International Raceway"
+ },
+ {
+  "value": 51,
+  "marker": 16384,
+  "name": "Left Hook"
+ },
+ {
+  "value": 115,
+  "marker": 32768,
+  "name": "Virginia International Raceway"
+ },
+ {
+  "value": 210,
+  "marker": 16384,
+  "name": "Snake"
+ },
+ {
+  "value": 839,
+  "marker": 32768,
+  "name": "(unnamed)"
+ },
+ {
+  "value": 48,
+  "marker": 16384,
+  "name": "South Bend"
+ },
+ {
+  "value": 296,
+  "marker": 32768,
+  "name": "(unnamed)"
+ },
+ {
+  "value": 61,
+  "marker": 16384,
+  "name": "Oak Tree Curve"
+ },
+ {
+  "value": 1101,
+  "marker": 32768,
+  "name": "(unnamed)"
+ },
+ {
+  "value": 112,
+  "marker": 16384,
+  "name": "Roller Coaster"
+ },
+ {
+  "value": 193,
+  "marker": 32768,
+  "name": "(unnamed)"
+ },
+ {
+  "value": 250,
+  "marker": 16384,
+  "name": "Hog Pen"
+ },
+ {
+  "value": 396,
+  "marker": 8192,
+  "name": "Virginia International Raceway"
+ }
+]

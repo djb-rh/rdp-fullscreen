@@ -1,0 +1,199 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-09-01T15:41:12Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "way",
+  "id": 91012243,
+  "bounds": {
+    "minlat": 36.5616660,
+    "minlon": -79.2047897,
+    "maxlat": 36.5616924,
+    "maxlon": -79.2044969
+  },
+  "nodes": [
+    214983364,
+    214983367
+  ],
+  "geometry": [
+    { "lat": 36.5616924, "lon": -79.2047897 },
+    { "lat": 36.5616660, "lon": -79.2044969 }
+  ],
+  "tags": {
+    "bridge": "yes",
+    "highway": "unclassified",
+    "name": "North Paddock Road",
+    "tiger:cfcc": "A41",
+    "tiger:county": "Halifax, VA"
+  }
+},
+{
+  "type": "way",
+  "id": 989721626,
+  "bounds": {
+    "minlat": 36.5550906,
+    "minlon": -79.2017020,
+    "maxlat": 36.5551160,
+    "maxlon": -79.2016304
+  },
+  "nodes": [
+    9146671378,
+    6475489547
+  ],
+  "geometry": [
+    { "lat": 36.5551160, "lon": -79.2017020 },
+    { "lat": 36.5550906, "lon": -79.2016304 }
+  ],
+  "tags": {
+    "bridge": "yes",
+    "highway": "unclassified",
+    "layer": "1",
+    "name": "South Bend Road",
+    "source:geometry": "Virginia Imagery Service - Most Recent",
+    "source:name": "https://vgin.maps.arcgis.com",
+    "surface": "paved"
+  }
+},
+{
+  "type": "way",
+  "id": 1254951067,
+  "bounds": {
+    "minlat": 36.5812952,
+    "minlon": -79.2036799,
+    "maxlat": 36.5813090,
+    "maxlon": -79.2033097
+  },
+  "nodes": [
+    215414095,
+    11665773036
+  ],
+  "geometry": [
+    { "lat": 36.5813090, "lon": -79.2036799 },
+    { "lat": 36.5812952, "lon": -79.2033097 }
+  ],
+  "tags": {
+    "NHS": "yes",
+    "bridge": "yes",
+    "expressway": "yes",
+    "hgv": "designated",
+    "hgv:national_network": "yes",
+    "highway": "trunk",
+    "lanes": "2",
+    "layer": "1",
+    "maxspeed": "60 mph",
+    "name": "Philpott Road",
+    "oneway": "yes",
+    "ref": "US 58;US 360",
+    "source:hgv:national_network": "Title 23: Highways Part 658 http://ecfr.gpoaccess.gov/cgi/t/text/text-idx?c=ecfr&rgn=div5&view=text&node=23:1.0.1.7.33&idno=23",
+    "surface": "asphalt",
+    "tiger:cfcc": "A25",
+    "tiger:county": "Halifax, VA",
+    "tiger:name_base": "Philpott",
+    "tiger:name_base_1": "United States Highway 360",
+    "tiger:name_base_2": "United States Highway 58",
+    "tiger:name_type": "Rd"
+  }
+},
+{
+  "type": "way",
+  "id": 1254951069,
+  "bounds": {
+    "minlat": 36.5814832,
+    "minlon": -79.2037358,
+    "maxlat": 36.5814965,
+    "maxlon": -79.2032966
+  },
+  "nodes": [
+    215415299,
+    11665773037
+  ],
+  "geometry": [
+    { "lat": 36.5814832, "lon": -79.2032966 },
+    { "lat": 36.5814965, "lon": -79.2037358 }
+  ],
+  "tags": {
+    "NHS": "yes",
+    "bridge": "yes",
+    "expressway": "yes",
+    "hgv": "designated",
+    "hgv:national_network": "yes",
+    "highway": "trunk",
+    "lanes": "2",
+    "layer": "1",
+    "maxspeed": "60 mph",
+    "name": "Philpott Road",
+    "oneway": "yes",
+    "ref": "US 58;US 360",
+    "source:hgv:national_network": "Title 23: Highways Part 658 http://ecfr.gpoaccess.gov/cgi/t/text/text-idx?c=ecfr&rgn=div5&view=text&node=23:1.0.1.7.33&idno=23",
+    "surface": "paved",
+    "tiger:cfcc": "A25",
+    "tiger:county": "Halifax, VA",
+    "tiger:name_base": "Philpott",
+    "tiger:name_base_1": "United States Highway 58",
+    "tiger:name_base_2": "United States Highway 360",
+    "tiger:name_type": "Rd",
+    "tiger:reviewed": "no",
+    "tiger:zip_left": "24592",
+    "tiger:zip_left_1": "24592"
+  }
+},
+{
+  "type": "way",
+  "id": 1254951071,
+  "bounds": {
+    "minlat": 36.5869000,
+    "minlon": -79.1827484,
+    "maxlat": 36.5869445,
+    "maxlon": -79.1827350
+  },
+  "nodes": [
+    11665773038,
+    215100800
+  ],
+  "geometry": [
+    { "lat": 36.5869445, "lon": -79.1827484 },
+    { "lat": 36.5869000, "lon": -79.1827350 }
+  ],
+  "tags": {
+    "bridge": "yes",
+    "highway": "track",
+    "layer": "1",
+    "tiger:cfcc": "A51",
+    "tiger:county": "Halifax, VA",
+    "tiger:reviewed": "no"
+  }
+},
+{
+  "type": "way",
+  "id": 1254951073,
+  "bounds": {
+    "minlat": 36.5856235,
+    "minlon": -79.1897900,
+    "maxlat": 36.5856392,
+    "maxlon": -79.1896878
+  },
+  "nodes": [
+    11665773040,
+    11665773039
+  ],
+  "geometry": [
+    { "lat": 36.5856235, "lon": -79.1897900 },
+    { "lat": 36.5856392, "lon": -79.1896878 }
+  ],
+  "tags": {
+    "bridge": "yes",
+    "highway": "track",
+    "layer": "1",
+    "tiger:cfcc": "A51",
+    "tiger:county": "Halifax, VA",
+    "tiger:reviewed": "no"
+  }
+}
+
+  ]
+}

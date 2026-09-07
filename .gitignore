@@ -1,0 +1,26 @@
+# Whitelist: only code, layout data and notes are tracked.  Everything derived
+# from the ROMs (helper images, dumps, disassemblies, built sets, renders,
+# recordings) stays out - the repo must never carry ROM data.
+*
+!.gitignore
+!*/
+!*.py
+!*.json
+!*.md
+!*.lua
+!*.sh
+!*.cpp
+*.bak
+__pycache__/
+patched*/
+roms_*/
+snap*/
+nvram*/
+cfg/
+artroms/
+blankroms/
+models/
+trackset/
+virset/
+ui/
+dasm/
