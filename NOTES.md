@@ -1556,3 +1556,44 @@ broadside view.  Stock never approaches its cuttings square-on.
 
 Prediction being tested: a crossing at ~60 degrees instead of 90 spreads the
 UNDERP's polygons in depth and stays under the window.
+
+## The approach band: what it IS and is NOT (2026-09-08, later)
+
+Corrects the two paragraphs above.  Measured with taps on the ADSP itself:
+
+* The polygon pool never runs dry: DM($0957) is never written 0 in any frame,
+  banded, clean or stock (pooltap.lua).  Pops/pushes per frame are ~100.
+* The output limit at 0x04F1 (skip a polygon when words+polys reach 0x1FA4 or
+  polys reach 0x1EA=490, flag DM($002A)) never fires: peaks 533 words / 166
+  polygons banded, 793 / 155 clean, 607 / 224 stock.
+* Every inserted polygon is emitted (170/170).  Depth keys DO carry the
+  object bias with the right sign (UNDERP -800 shifts every key by -1600),
+  and the key is the polygon's clipped-centroid depth plus bias; the DOTLINE's
+  19201-unit base quad is keyed ~7100 and drawn early, its slabs and dashes
+  later.  Draw order among the trio is UNDERP, road, deck at every position
+  tested, ours and stock's alike.
+* The output stream (DM $2002, stream.lua) is a scanline command list per
+  polygon: 051C type, 056C/056E first/last row (0..0x1FF), 0572 shaded colour,
+  then edge records.  In the CLEAN frame the road's nearest polygon (shade
+  0x21) spans rows 0x016-0x18B, to the bottom of the view.  In the BANDED frame
+  the road's nearest present polygon is a farther slab (shade 0x13) ending at
+  row 0x14F; the two polygons that cross the camera plane - the c38 slab
+  under the car AND the c40 base quad - are simply absent from the stream, and
+  the ground shows below row 0x14F.  Camera matrix and car pose are identical
+  in both frames.
+* Not the cause: bias (0, -400, +400 on the road; -800..+3000 on the cutting),
+  a triple deck, half-length pieces, a 60-degree crossing, the carrying
+  piece's centre position (t=0.26), wide polygons in general (two DOTLINEs
+  laid parallel to the oval's start straight render perfectly), compact
+  scenery.  Hiding the UNDERP restores the road every time.
+* Positions: banded 4000-6200 before the crossing (camera over a c38 slab in
+  every banded frame; over the c40 gap in the clean ones at 3186 and 2436, but
+  1836 over a slab was clean too), clean at 1650 and closer, a brief band on
+  exit.  Stock's crossing (UNDERP rec 101) is clean at 4500 and 7264 before.
+
+What remains: the per-object polygon pipeline (0x0100-0x04F0, the near-object
+path at 0x06AD and whatever decides how a polygon crossing the camera plane is
+handled) rejects the camera-plane polygons of the road when the cutting is
+also "near" at mid distance.  Reading that code is the next step; until then
+the design rule stands (no long straight run-in to a cutting) and the
+validator should flag it.

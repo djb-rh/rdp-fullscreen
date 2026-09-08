@@ -82,6 +82,7 @@ VIR.md the earlier world/map work.  This file is the roadmap.
 | R5 | ~~Every road piece's true geometry~~ DONE (rdtrack/parts.py -> parts.json); stunt pieces still need a 3D treatment | the parts library must be complete and trustworthy | measured from the object ROM by tool |
 | R6 | Terrain/horizon/sky and the ground colour outside placements | what a blank world looks like | placement-free build and look |
 | R7 | Track-select strings and any per-track text in the main ROM | optional renaming of slots | string search |
+| R8 | ADSP: why the camera-plane polygons of the road are culled when a cutting is in view at mid distance (NOTES.md 2026-09-08) | bands on any straight approach to an underpass | read 0x0100-0x04F0 / 0x06AD; stream.lua + variant2.py reproduce it statically |
 
 ## Phases
 
