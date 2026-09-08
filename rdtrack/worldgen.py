@@ -172,6 +172,7 @@ def segment_records(samples, closed=True):
     return recs
 
 
+DECK_OFFSETS = (0,)               # one deck like stock (three at +/-2200 were tried against the approach band: no effect)
 CARRY = 200                 # only the piece the crossing falls in rides on the deck (stock: one D30R917);
                             # giving the neighbours -400 too sorted them in front of the cutting banks
 BIAS_CARRIED = -400         # stock: the road over the cutting, its only nonzero road bias
@@ -231,7 +232,9 @@ def expand(design, cat, obj_index, tails):
         for i in range(len(pl)):
             if pl[i]["name"] != "UNDERP" and base[i] - CARRY <= xarc <= base[i] + lengths[i] + CARRY:
                 carried.add(i)
-        decks.append((x, z, hd - 90))
+        for off in DECK_OFFSETS:
+            dx, dz = math.sin(math.radians(hd)), math.cos(math.radians(hd))
+            decks.append((x + dx*off, z + dz*off, hd - 90))
         print("  crossing: UNDERP piece %d under piece %d (%s) at (%d, %d), deck heading %.1f, carried %s" % (k, j, pl[j]["name"], x, z, hd - 90, sorted(carried)))
     def rec(p, bias=None):
         obj = obj_index[p["name"]]; b, f = tails.get(p["name"], (0, 0x1000))

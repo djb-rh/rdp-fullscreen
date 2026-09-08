@@ -1497,3 +1497,27 @@ at 1, off-road on the first curve).  The generator now walks the links.
   Why stock's +111/+142 gets away with it on its own geometry is not known.
 * `-video none` is the headless flag: identical frames, and it leaves the
   user's screen alone (-nowindow did not).
+
+## The bridge-approach band, properly (2026-09-08)
+
+Captured on the user's own drive (rd.lua SNAP=58-78) and reproduced statically
+by shifting the start segment's origin in sub-segment steps (variant2.py):
+on the figure-8's upper straight the near road vanishes (green ground shows
+through) with the car 4000-4800 units before the crossing, and is intact at
+3200 and closer.  Not an overpaint: hiding the UNDERP restores the road,
+hiding the deck changes nothing, UNDERP bias +3000 changes nothing, three deck
+sections covering the verges change nothing, DOTLHALFs instead of DOTLINEs on
+the straight change nothing.  The polygon pool is at 496 in every frame -
+stock's crossing included - so exhaustion is the normal state; the near road
+is drawn last and gets whatever is left, and with the UNDERP seen BROADSIDE at
+mid distance (its 19201-unit quads subdivided by depth) there is nothing left.
+The +800 UNDERP bias that cleared the 1540-before position moved the UNDERP
+earlier in the draw order and happened to leave enough for the road there;
+it does not help further out.  Stock's crossings are clean at every distance
+tried (segments 370-373 around UNDERP rec 101): stock approaches its cutting on
+a CURVE, so the cutting is never square in the middle of the view for long.
+
+Design guidance until the ADSP's insertion/drop rule is read from its code
+(0x0855 skips the insert when the pool is empty; the object walk is 0x0900,
+the sorted insert 0x0945): do not run a long straight head-on at a cutting;
+approach crossings on a curve as stock does.  Open item for the renderer work.
