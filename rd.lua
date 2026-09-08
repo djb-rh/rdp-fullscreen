@@ -156,7 +156,8 @@ if TIMEUP then print(string.format("[rd] TIME: clock topped up to %d s whenever 
 local LOGGING = os.getenv("LOG") == "1"
 local logf = LOGGING and io.open("drive_log.csv", "w") or nil
 if logf then
-  local h = {"frame","clock","x","y","z","offroad","sect_val","sect_idx","curseg","d54","d58","d60","polys","listlen","movers","polymax","freemin","resets"}
+  local h = {"frame","clock","x","y","z","offroad","sect_val","sect_idx","curseg","d54","d58","d60","polys","listlen","movers","polymax","freemin","resets",
+             "nodeflags","latch624","latch626","f9058c8","f901116","kind"}
   for i = 0, 25 do h[#h+1] = string.format("dsp%02X", 0x50 + i*2) end
   logf:write(table.concat(h, ",") .. "\n")
   print("[rd] LOG: writing drive_log.csv every frame")
@@ -267,6 +268,10 @@ local function logline(frames)
   local r = {frames, s32(0x9016DA), s32(0x900044), s32(0x900048), s32(0x90004C),
              u16(0x9016BA), s16(0x9016C0), u16(0x9016C2), curseg,
              s16(0x900D54), s16(0x900D58), s32(0x900D60), polys(), listlen(), movers(), polymax(), freemin(), resets()}
+  -- route node and the award latches (NOTES.md "award A"): node flags high nibble is the marker
+  local node = sp:read_u32(0x9015EC)
+  r[#r+1] = string.format("%04X", (node >= 0x940000 and node < 0x960000) and u16(node + 8) or 0)
+  r[#r+1] = u16(0x901624); r[#r+1] = u16(0x901626); r[#r+1] = u16(0x9058C8); r[#r+1] = u16(0x901116); r[#r+1] = u16(0x9016C8)
   for i = 0, 25 do r[#r+1] = s16(0x900C70 + 0x50 + i*2) end
   logf:write(table.concat(r, ",") .. "\n")
   if frames % 300 == 0 then logf:flush() end
