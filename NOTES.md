@@ -1521,3 +1521,38 @@ Design guidance until the ADSP's insertion/drop rule is read from its code
 (0x0855 skips the insert when the pool is empty; the object walk is 0x0900,
 the sorted insert 0x0945): do not run a long straight head-on at a cutting;
 approach crossings on a curve as stock does.  Open item for the renderer work.
+
+## The ADSP polygon pool, read from the code (2026-09-08)
+
+Corrects the 2026-09-06 decode: 0x0855 is not the insert, it is the FLUSH.
+
+* Pool (0x07C4): 495 six-word entries at PM $124E+6k, [key lo, key hi, ?,
+  link, data, data]; free list threaded through word +3, head DM($0957),
+  the LAST entry's link is 0.  Sentinels $1236/$123C, list head $123F ->
+  $1242 (far terminator), $1248 (near terminator).
+* Insert (0x0801): pops DM($0957) with NO empty check, writes the polygon's
+  depth key, walks the pending list from the last insertion hint DM($0958)
+  and links it in depth order.  When the pool is exhausted DM($0957) is 0 and
+  the next polygon is written into PM $0000..$0005 - the interrupt vectors -
+  and is lost, as is every polygon after it.  That is the "drop".
+* Main loop (0x0040-0x00CC): walk the sorted object list far to near; for
+  each object generate its (subdivided) polygons into the pending list, then
+  CALL 0x0855, which pops and emits (DM $2002) every pending polygon whose key
+  is >= the NEXT object's sort key (DM($002E) -> record word 22/23 = +0x2C).
+  Pending = polygons nearer than the next object, waiting to interleave with
+  it.  A painter's sort across objects with a 495-polygon window.
+
+So the budget that matters is not "polygons in view" but "polygons of one
+object nearer than the next object's key, plus what was already pending".  A
+cutting seen SQUARE-ON at mid distance puts all of its finely subdivided
+polygons at nearly one depth, all nearer than the road's key (cz - 400 +
+radius): hundreds pending at once, the pool overflows during the UNDERP, and
+the road under the car - inserted next - is lost wholesale.  Far away the
+subdivision is coarse; very near, most of the cutting is outside the frustum;
+mid distance is the trap, and it is exactly where the band was (4000-4800
+before the crossing).  Stock's -400 on the carrying road is a real mitigation
+(a smaller next key flushes more of the cutting first) but cannot save a
+broadside view.  Stock never approaches its cuttings square-on.
+
+Prediction being tested: a crossing at ~60 degrees instead of 90 spreads the
+UNDERP's polygons in depth and stays under the window.
