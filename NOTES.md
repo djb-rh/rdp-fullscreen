@@ -1467,3 +1467,33 @@ marker.  One bug on the way: segment ahead/behind links are RECORD indices
 (record 0 is the header), so sample i links to i+2; with i+1 the first
 segment pointed at itself and the DSP never advanced (drive_log curseg stuck
 at 1, off-road on the first curve).  The generator now walks the links.
+
+## Figure-8 lessons (2026-09-08)
+
+* **Gate awards.**  0x02F0B8: a marker-8 section CLEARS the two award latches
+  (0x901624 finish, 0x901626 gate); a marker-4 section PAYS award A (32 s) if
+  its latch is clear and 0x901116/0x9058C8 are zero; the finish (marker 2)
+  pays award B (44 s here) once per re-arm.  Stock route A's first CHKPT is a
+  marker-8 node - it re-arms and pays nothing; the far one (0x4001) pays.
+  Confirmed in a logged drive (rd.lua now logs the latches and the node
+  marker): +32 s exactly at the marker-4 section, +44 s at the finish, nothing
+  at marker 8.  worldgen now makes every designed gate a marker-4 section
+  followed by an invisible marker-8 re-arm section (and one after the start).
+* **Node advance is positional**, not "0x900D54 == next value": forcing the
+  section value from Lua stepped nothing.  The 68010 writes 0x900D54 itself
+  from the node (0x02FC2E); the DSP consumes it.
+* **Lap ends where the finish section begins.**  Stock: finish node = seg 15,
+  13182 before the post; car start seg 352; start node = seg 131, 2000 after
+  the post.  worldgen: finish node on the post's segment, start node the next
+  one, header start = the post's segment -> the lap completes at the line
+  (user-confirmed).
+* **Bridge-approach band = the cutting's verges over the road.**  Static
+  snapshots stepping the car along the approach (start-segment builds,
+  -video none) caught it at one segment: the whole near road painted in the
+  UNDERP's ground colour.  The camera's own road is drawn outside the sorted
+  list, so the road's bias is irrelevant (-2000 changed nothing) and only the
+  UNDERP's key matters: +600 clears it, +800 is clean at every approach
+  position, +2000 breaks the view from inside the cutting.  BIAS_UNDERP = 800.
+  Why stock's +111/+142 gets away with it on its own geometry is not known.
+* `-video none` is the headless flag: identical frames, and it leaves the
+  user's screen alone (-nowindow did not).

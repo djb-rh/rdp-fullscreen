@@ -175,6 +175,12 @@ def segment_records(samples, closed=True):
 CARRY = 200                 # only the piece the crossing falls in rides on the deck (stock: one D30R917);
                             # giving the neighbours -400 too sorted them in front of the cutting banks
 BIAS_CARRIED = -400         # stock: the road over the cutting, its only nonzero road bias
+BIAS_UNDERP = 800           # stock uses +111/+142, but on the approach to the deck the cutting's
+                            # ground-level verges (coplanar with the road on top) painted over the
+                            # road we were driving on - the camera's own road is drawn outside the
+                            # sorted list, so only the cutting's key can be moved.  +600 is the
+                            # threshold, +2000 breaks the view from inside the cutting; +800 is clean
+                            # at every position tested (NOTES.md, 2026-09-08).
 
 
 def _seg_cross(p, q, r, t):
@@ -236,7 +242,7 @@ def expand(design, cat, obj_index, tails):
         obj = obj_index[s["name"]]; b, f = tails.get(s["name"], (0, 0x1000))
         records.append(placement_record(obj, heading_matrix(s.get("heading", 0)), s["x"], s.get("y", 0), s["z"], b, f))
     records += [rec(pl[i], BIAS_CARRIED) for i in sorted(carried)]
-    records += [rec(p) for p in pl if p["name"] == "UNDERP"]
+    records += [rec(p, BIAS_UNDERP) for p in pl if p["name"] == "UNDERP"]
     for x, z, hd in decks:
         b, f = tails.get("XOVER", (-200, 0x1000))
         records.append(placement_record(obj_index["XOVER"], heading_matrix(hd), x, 0, z, b, f))
@@ -257,16 +263,24 @@ def expand(design, cat, obj_index, tails):
             post = i
     n = len(samples)
     nodes = []
-    for r in design["route"]:
-        mk = r.get("marker", 0)
-        if mk == 1:
-            seg = (post + 1) % n + 1
-        elif mk == 2:
-            seg = post + 1
-        else:
-            seg = first_seg[r["piece"]] + 1                   # segment index (record 0 is the header)
+    def node(seg, mk, name, rtype=0):
         nodes.append({"value": seg + BIAS - 1, "value2": seg + BIAS - 1, "w4": 0,
-                      "flags": (mk << 12) | (r.get("type", 0) << 8) | r.get("name", 1), "wE": 0, "w16": 0, "prev": "self" if not nodes else len(nodes) - 1})
+                      "flags": (mk << 12) | (rtype << 8) | name, "wE": 0, "w16": 0, "prev": "self" if not nodes else len(nodes) - 1})
+    # The game pays award A only at a marker-4 section, and only once until a
+    # marker-8 section re-arms it (0x02F0B8); stock's first CHKPT is a marker-8
+    # section and pays nothing.  Here every gate in the design pays: it becomes a
+    # marker-4 section and a marker-8 re-arm section follows it (and the start).
+    for r in design["route"]:
+        mk = r.get("marker", 0); nm = r.get("name", 1); rt = r.get("type", 0)
+        if mk == 1:
+            node((post + 1) % n + 1, 1, nm, rt); node((post + 2) % n + 1, 8, nm, rt)
+        elif mk == 2:
+            node(post + 1, 2, nm, rt)
+        elif mk in (4, 8):
+            seg = first_seg[r["piece"]] + 1                   # segment index (record 0 is the header)
+            node(seg, 4, nm, rt); node(seg + 1, 8, nm, rt)
+        else:
+            node(first_seg[r["piece"]] + 1, 0, nm, rt)
     # start line and gates: at the route's start/gate sections, facing the travel heading
     NAME_START, NAME_GATE = 0x0113C, 0x01146          # "STRTPOST" / "CHKPT" strings in the front region
     entities = []
@@ -274,7 +288,7 @@ def expand(design, cat, obj_index, tails):
         mk = r.get("marker", 0)
         if mk not in (1, 4, 8):
             continue
-        i = post if mk == 1 else first_seg[r["piece"]]; s = samples[i]; nxt = samples[(i + 1) % len(samples)]
+        i = post if mk == 1 else first_seg[r["piece"]]; s = samples[i]; nxt = samples[(i + 1) % len(samples)]   # every gate pays now
         hd = math.degrees(math.atan2(nxt["x"] - s["x"], nxt["z"] - s["z"])) % 360
         entities.append({"name_at": NAME_START if mk == 1 else NAME_GATE, "type": 1 if mk == 1 else 2,
                          "x": int(round(s["x"])), "y": int(round(-s["elev"])), "z": int(round(s["z"])), "w18": 0, "heading": int(round(hd / 360 * 65536)) & 0xFFFF})
