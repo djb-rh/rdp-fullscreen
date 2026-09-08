@@ -1,0 +1,80 @@
+{
+ "start": [
+  150000,
+  200000,
+  90.0
+ ],
+ "close": true,
+ "chain": [
+  [
+   "DOTLINE",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "DOTLINE",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ]
+ ],
+ "scenery": [],
+ "route": [
+  {
+   "piece": 0,
+   "marker": 1,
+   "name": 0
+  },
+  {
+   "piece": 3,
+   "marker": 8,
+   "name": 1
+  },
+  {
+   "piece": 5,
+   "marker": 0,
+   "name": 1
+  },
+  {
+   "piece": 8,
+   "marker": 4,
+   "name": 1
+  },
+  {
+   "piece": 9,
+   "marker": 2,
+   "name": 1
+  }
+ ],
+ "start_piece": 0,
+ "start_offset": 3000
+}

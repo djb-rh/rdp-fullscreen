@@ -212,6 +212,7 @@ def measure(w, i):
            "exit": [round(cl[-1][0], 1), round(cl[-1][2], 1), round(h_out, 2)],
            "chord": round(chord, 1), "turn": round(turn, 2), "length": round(arc[-1], 1),
            "sections": len(cl), "profile": prof, "bank": bank,
+           "centreline": [[round(p[0], 1), round(p[2], 1), round(-p[1], 1)] for p in cl],   # model x, z, elevation (down +)
            "elev_min": min(e for _s, e in prof), "elev_max": max(e for _s, e in prof),
            "radius_cat": w.catalogue(i)["radius"]}
     if fit:
