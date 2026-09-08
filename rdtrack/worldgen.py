@@ -164,8 +164,9 @@ def segment_records(samples, closed=True):
              round(16384*cX*ct), round(16384*sX), round(-16384*cX*st),
              round(16384*st), 0, round(16384*ct))
         recs.append({"x": int(round(s["z"])), "z": int(round(s["x"])), "elev": int(round(s["elev"])), "m": list(M), "w1E": 0,
-                     "flags": FLAGS_ROAD, "ahead": (i+1) % n if closed else (i+1 if i+1 < n else -1), "w26": 0,
-                     "behind": (i-1) % n if closed else (i-1 if i else -1), "w2A": 0,
+                     # links are RECORD indices: record 0 is the header, sample i is record i+1
+                     "flags": FLAGS_ROAD, "ahead": ((i+1) % n) + 1 if closed else (i+2 if i+1 < n else -1), "w26": 0,
+                     "behind": ((i-1) % n) + 1 if closed else (i if i else -1), "w2A": 0,
                      "laneL": -1, "w2E": 0xFFFF, "laneR": -1, "w32": 0xFFFF,
                      "hi": s["hi"], "w36": 0, "lo": s["lo"], "w3A": 0, "edgeL": EDGE, "edgeR": -EDGE})
     return recs
