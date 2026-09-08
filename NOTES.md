@@ -1454,3 +1454,16 @@ champion record (name, time 0x5AD2 = 93.0 s, parameters) and the list at
 of the 128 KB region, plus 18.6 KB per ghost lap.  Recording in MAME = log
 position, heading, pitch, roll every 12 frames (rd.lua already logs per
 frame), difference into keyframes, prepend a run-in from the parked spot.
+
+## Phase 2 milestone (2026-09-08): the oval
+
+designs/oval.json (DOTLINE + 4 x C4572 + DOTLINE + 4 x C4572, closing exactly)
+compiled by rdtrack.make replaces world A in an otherwise stock image: 10
+placements, 67 segments, 5 route sections.  Driven by the user: laps count,
+the start/finish and a checkpoint per lap work, "qualified for championship".
+So the checkpoint gate movers place themselves from the route's gate markers
+(4/8) - nothing else was provided - and the start light/post from the start
+marker.  One bug on the way: segment ahead/behind links are RECORD indices
+(record 0 is the header), so sample i links to i+2; with i+1 the first
+segment pointed at itself and the DSP never advanced (drive_log curseg stuck
+at 1, off-road on the first curve).  The generator now walks the links.

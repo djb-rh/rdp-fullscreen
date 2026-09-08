@@ -100,7 +100,7 @@ does not round-trip is a field we do not understand yet.  Resolves R1-R3 as
 side effects and starts R4 (drone table located and decoded, budget measured).
 This is the highest-information step and the one to start with.
 
-### Phase 2 - the first custom track  [started 2026-09-07: designs/oval.json compiles from blank and renders; drive test pending]
+### Phase 2 - the first custom track  [DONE 2026-09-08: designs/oval.json lapped in MAME with gates and qualifying; bridge/underpass, scenery, drones and all-slots-one-world still to do]
 Deliverable: a hand-written document (an oval with one banked turn and a
 bridge, say) compiled from blank, all three slots pointing at it, driven in
 MAME and on hardware.  Proves whole-world replacement, R1's answers, and the
