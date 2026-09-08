@@ -176,6 +176,34 @@ DECK_OFFSETS = (0,)               # one deck like stock (three at +/-2200 were t
 CARRY = 200                 # only the piece the crossing falls in rides on the deck (stock: one D30R917);
                             # giving the neighbours -400 too sorted them in front of the cutting banks
 BIAS_CARRIED = -400         # stock: the road over the cutting, its only nonzero road bias
+MARGIN_KEY = 300            # extra separation in sort-key units (2 world units each)
+WALL_OFF, WALL_HALF = 3200, 9600   # the UNDERP's fill walls: lateral offset and half-length
+
+
+def carried_bias(phi_deg, t_far, bias_underp):
+    """Depth bias for the road piece that carries a crossing.
+
+    The renderer keys every polygon by (its farthest vertex depth)/2 + the
+    object's bias and paints far to near.  The UNDERP's outer faces are
+    fill-to-screen-bottom faces in the ground colour; if they sort NEARER than
+    the carrying road's base quad they paint over it, and the only thing that
+    repairs the bottom of the screen is the slab under the car - which the
+    scan converter drops when a full-width slab's top edge lands on a 1-pixel
+    slant.  Hence the bands on a long straight run-in (NOTES.md, R8).
+    Condition for no flood, with the camera d before the crossing:
+        (d - WALL_OFF/sin phi + WALL_HALF|cos phi|)/2 + bias_U
+          >= (d + t_far)/2 + bias_road + margin
+    d cancels; phi = angle between the cutting and the road (90 = square),
+    t_far = carrying piece beyond the crossing in the driving direction.
+    Stock's angled crossing on a curve satisfies it with -400; a square
+    crossing on a DOTLINE needs about -6000.  A very negative bias makes the
+    road paint over cars driving on that piece near its far end (hidden
+    within 2*|bias| of the end), so keep crossings oblique and the carrying
+    piece short or curved where traffic matters."""
+    s = max(math.sin(math.radians(phi_deg)), 0.2)
+    wall_far = -WALL_OFF / s + WALL_HALF * abs(math.cos(math.radians(phi_deg)))
+    need = bias_underp + (wall_far - t_far) / 2.0 - MARGIN_KEY
+    return int(min(BIAS_CARRIED, round(need / 100.0) * 100))
 BIAS_UNDERP = 800           # stock uses +111/+142, but on the approach to the deck the cutting's
                             # ground-level verges (coplanar with the road on top) painted over the
                             # road we were driving on - the camera's own road is drawn outside the
@@ -224,18 +252,26 @@ def expand(design, cat, obj_index, tails):
     lengths = [g[0][-1][3] for g in geoms]
     base = [sum(lengths[:k]) for k in range(len(pl))]
     xs = crossings(pl, geoms)
-    carried, decks = set(), []
+    carried, decks, cbias = set(), [], {}
     for k, j, x, z, hd, arc_low, arc_up in xs:
         if abs(arc_low - lengths[k]/2) > 1600:
             print("  WARNING: crossing sits %.0f from the UNDERP's centre (floor is +/-1600)" % (arc_low - lengths[k]/2))
         xarc = base[j] + arc_up
+        # angle between the cutting's axis and the upper road at the crossing
+        low = geoms[k][0]; ia = min(range(len(low)-1), key=lambda i: abs(low[i][3] - arc_low))
+        low_hd = math.degrees(math.atan2(low[ia+1][0]-low[ia][0], low[ia+1][1]-low[ia][1]))
+        phi = abs(((hd - low_hd + 90) % 180) - 90); phi = 90 - abs(phi - 90) if False else (180 - abs(((hd - low_hd) % 360) - 180))
+        phi = min(phi, 180 - phi)
         for i in range(len(pl)):
             if pl[i]["name"] != "UNDERP" and base[i] - CARRY <= xarc <= base[i] + lengths[i] + CARRY:
                 carried.add(i)
+                t_far = base[i] + lengths[i] - xarc            # carrying piece beyond the crossing
+                cbias[i] = min(cbias.get(i, 0), carried_bias(phi, t_far, BIAS_UNDERP))
         for off in DECK_OFFSETS:
             dx, dz = math.sin(math.radians(hd)), math.cos(math.radians(hd))
             decks.append((x + dx*off, z + dz*off, hd - 90))
-        print("  crossing: UNDERP piece %d under piece %d (%s) at (%d, %d), deck heading %.1f, carried %s" % (k, j, pl[j]["name"], x, z, hd - 90, sorted(carried)))
+        print("  crossing: UNDERP piece %d under piece %d (%s) at (%d, %d), angle %.0f deg, deck heading %.1f, carried %s bias %s" % (
+            k, j, pl[j]["name"], x, z, phi, hd - 90, sorted(carried), {i: cbias[i] for i in sorted(cbias)}))
     def rec(p, bias=None):
         obj = obj_index[p["name"]]; b, f = tails.get(p["name"], (0, 0x1000))
         return placement_record(obj, p["m"], p["x"], 0, p["z"], b if bias is None else bias, f)
@@ -244,7 +280,7 @@ def expand(design, cat, obj_index, tails):
     for s in design.get("scenery", []):
         obj = obj_index[s["name"]]; b, f = tails.get(s["name"], (0, 0x1000))
         records.append(placement_record(obj, heading_matrix(s.get("heading", 0)), s["x"], s.get("y", 0), s["z"], b, f))
-    records += [rec(pl[i], BIAS_CARRIED) for i in sorted(carried)]
+    records += [rec(pl[i], cbias.get(i, BIAS_CARRIED)) for i in sorted(carried)]
     records += [rec(p, BIAS_UNDERP) for p in pl if p["name"] == "UNDERP"]
     for x, z, hd in decks:
         b, f = tails.get("XOVER", (-200, 0x1000))

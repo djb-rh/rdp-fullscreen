@@ -1597,3 +1597,73 @@ handled) rejects the camera-plane polygons of the road when the cutting is
 also "near" at mid distance.  Reading that code is the next step; until then
 the design rule stands (no long straight run-in to a cutting) and the
 validator should flag it.
+
+## R8 RESOLVED: the approach band, mechanism and fix (2026-09-08)
+
+Read from the ADSP code and confirmed by taps at every stage.  Everything
+below is measured, not inferred.
+
+**Renderer facts** (adsp_program.dasm):
+* Per object: 0x011E transforms vertices into camera space, block-floating
+  scaled by an exponent from the object's position (DM $0032; shift 1 for
+  everything within ~8000).  0x017E walks the faces: backface test 0x01F2
+  (dot(normal, v0)), face types by header nibble (0 end, 1 = "fill", F =
+  normal), colour/shade 0x021E, clipper 0x027B (z >= 100 then the four
+  frustum planes, alternating vertex buffers DM $0043 / $08EB, drop at 0x02EF
+  when nothing is left), projection 0x04B8 (x' = 255 + x*k/z, y' = 255 -
+  y*k/z, k ~ 508; reciprocals from EPROM page 1 via $2001/$2007), output
+  0x04F1 (clamp to 0..511, scan-convert, emit).
+* The output stream (DM $2002 -> SOM shared memory 0x810000 on the 68010,
+  double banked, copied whole to the GSP at 0x04BC60 in two chunks per
+  batch) is per polygon: colour&0x1F, x of the leftmost top vertex, x of the
+  rightmost top vertex, y of the top, then edge records (dx_right lo/hi,
+  dx_left lo/hi, rows) walking both edges down (0x0514-0x05D7, slopes from
+  0x05E6/0x0610).  Rows are screen rows 0..511, 511 = bottom of the view.
+* **Depth key = (max vertex z of the face) / 2^shift + object bias**, inserted
+  into the pending list (0x0801, no free check) and flushed after each object
+  for keys >= the next object's key (0x0855).  Painter's order far to near.
+  This reproduces every key seen: fill wall at 1636 -> 818+800 = 1618, the
+  DOTLINE base with its far end at 14245 -> 7122-400 = 6722, the slab under
+  the car -> 322-400 = -78.
+* **Type-1 faces** (0x01A1 / 0x0697 / 0x066C): no clipping (skipped if any
+  vertex z < 200), emitted as fill-to-screen-bottom rectangles from their
+  top edge.  The UNDERP's four outer faces are such faces in the ground
+  colour (12): they repaint the ground in front of the cutting from the
+  verge edge (row 299 at 1636 ahead) straight down 213 rows to the bottom.
+
+**The band.**  Flood iff fill key < base key of the road under the car.  With
+the camera d before a square crossing on a DOTLINE: fill = (d-3200)/2 + 800,
+base = (d+9600)/2 - 400 -> the base is ALWAYS drawn first and the fill paints
+green over it down to the bottom of the screen.  Normally the slab under the
+car (key ~0, drawn last) re-covers rows 366-511 and only a band between the
+fill top and the slab top shows in the c40 gaps between slabs - "bands across
+the track".  When the slab's two top vertices project one row apart (a
+1-pixel slant across the full width - straight road, camera nearly aligned),
+the scan converter puts both top x's at 511 with crossed edges and the slab
+is lost: the whole bottom floods.  Identical inputs in the banded and clean
+frames - the difference is only which slab is under the car and its slant.
+Stock never shows it because its crossings are OBLIQUE and on CURVES: the
+fill wall's far end is deep (9600|cos phi| deeper), so its key beats the
+base, and a D30R917's base is seven short quads anyway.
+
+**General condition** (d cancels):
+    (-3200/sin phi + 9600|cos phi| - t_far)/2 + bias_U - bias_road >= margin
+phi = crossing angle, t_far = carrying piece beyond the crossing in the
+driving direction.  worldgen.carried_bias() solves it for the carrying
+piece: -5800 for this square DOTLINE crossing, ~-400 for a stock-like one.
+Verified clean at 60/64/66(+0,+800)/67/69 on the figure-8 (12 frames).
+
+**Trade-off of a strongly negative road bias:** the road paints over anything
+on that piece within 2|bias| of its far end (a drone on the bridge).  Keep
+crossings oblique and the carrying piece short or curved where traffic
+matters; the validator should report the occlusion zone.
+
+Falsified along the way (all measured): pool exhaustion, output limits
+(0x1FA4 words / 490 polys, never hit), batch size, span caps, fill-rate/
+frame time (18 Hz everywhere; the ADSP waits on the 68010 more on stock),
+block-float exponent, near-object designation, wide polygons in general.
+
+Separate, pre-existing: from the FOOT of the exit ramp inside the cutting
+(segment 10, camera 666 below ground) the frame is all ground colour with
+either bias - the far wall's fill face seen from below the wall tops.  Not
+introduced here; stock's cutting has the same faces.  Left for later.
