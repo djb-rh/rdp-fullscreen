@@ -63,13 +63,21 @@ def place(pose, name, rev=False):
             exit_pose)
 
 
-def entry_poses(start, seq, close=None):
+OVERLAP = 40    # stock overlaps neighbouring pieces (median 36 units, 64 of 79 joints in
+                # world A); an exact butt joint plus the closure spread leaves a sliver of
+                # ground showing as a hairline across the road
+
+
+def entry_poses(start, seq, close=None, overlap=OVERLAP):
     N = len(seq)
 
     def run(dth):
         pose, poses = tuple(start), []
         for k, (name, rev) in enumerate(seq):
             pose = (pose[0], pose[1], pose[2] + dth/N)
+            if k:
+                r = math.radians(pose[2])
+                pose = (pose[0] - overlap*math.sin(r), pose[1] - overlap*math.cos(r), pose[2])
             poses.append(pose)
             _p, pose = place(pose, name, rev)
         return poses, pose

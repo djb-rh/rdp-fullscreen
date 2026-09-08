@@ -153,6 +153,13 @@ if TIMEUP then print(string.format("[rd] TIME: clock topped up to %d s whenever 
 -- +0x58 of it is the segment index the DSP says we are on (the 68010 turns it
 -- into the record address at 0x9016D2).  Drive the crossover both ways with
 -- this on and the log shows, frame by frame, which road the game put you on.
+-- SNAP="a-b": while the current segment is within a..b, snapshot every 3rd
+-- frame into MAME's snap directory (for catching rendering faults on a real
+-- drive; -snapshot_directory picks where they go).
+local SNAP = os.getenv("SNAP")
+local snap_lo, snap_hi = nil, nil
+if SNAP then snap_lo, snap_hi = SNAP:match("^(%d+)%-(%d+)$"); snap_lo = tonumber(snap_lo); snap_hi = tonumber(snap_hi)
+  print(string.format("[rd] SNAP: snapshots while on segments %d..%d", snap_lo, snap_hi)) end
 local LOGGING = os.getenv("LOG") == "1"
 local logf = LOGGING and io.open("drive_log.csv", "w") or nil
 if logf then
@@ -265,6 +272,7 @@ local function logline(frames)
     if not ok then return -1 end; if v >= 0x80000000 then v = v - 0x100000000 end; return v end
   local base = sp:read_u32(0x900D5A); local cur = sp:read_u32(0x9016D2)
   local curseg = (base > 0 and cur >= base) and math.floor((cur - base) / 64) or -1
+  if snap_lo and curseg >= snap_lo and curseg <= snap_hi and frames % 3 == 0 then mach.video:snapshot() end
   local r = {frames, s32(0x9016DA), s32(0x900044), s32(0x900048), s32(0x90004C),
              u16(0x9016BA), s16(0x9016C0), u16(0x9016C2), curseg,
              s16(0x900D54), s16(0x900D58), s32(0x900D60), polys(), listlen(), movers(), polymax(), freemin(), resets()}
