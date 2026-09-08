@@ -172,18 +172,73 @@ def segment_records(samples, closed=True):
     return recs
 
 
+CARRY = 10000               # road within this much arc of a crossing rides on the deck
+BIAS_CARRIED = -400         # stock: the road over the cutting, its only nonzero road bias
+
+
+def _seg_cross(p, q, r, t):
+    d1 = (q[0]-p[0], q[1]-p[1]); d2 = (t[0]-r[0], t[1]-r[1]); den = d1[0]*d2[1] - d1[1]*d2[0]
+    if abs(den) < 1e-9:
+        return None
+    u = ((r[0]-p[0])*d2[1] - (r[1]-p[1])*d2[0]) / den; v = ((r[0]-p[0])*d1[1] - (r[1]-p[1])*d1[0]) / den
+    return (u, v) if 0 <= u <= 1 and 0 <= v <= 1 else None
+
+
+def crossings(pl, geoms):
+    """Where an UNDERP's centreline is crossed by another piece: [(lower k, upper j,
+    x, z, upper heading, arc on lower, arc on upper)]."""
+    out = []
+    for k, p in enumerate(pl):
+        if p["name"] != "UNDERP":
+            continue
+        low = geoms[k][0]
+        for j, q in enumerate(pl):
+            if j == k or abs(j - k) == 1 or (min(j, k) == 0 and max(j, k) == len(pl) - 1):
+                continue
+            up = geoms[j][0]
+            for a, b in zip(low, low[1:]):
+                for c, d in zip(up, up[1:]):
+                    h = _seg_cross(a, b, c, d)
+                    if h:
+                        u, v = h
+                        x, z = a[0] + (b[0]-a[0])*u, a[1] + (b[1]-a[1])*u
+                        hd = math.degrees(math.atan2(d[0]-c[0], d[1]-c[1]))
+                        out.append((k, j, x, z, hd, a[3] + (b[3]-a[3])*u, c[3] + (d[3]-c[3])*v))
+    return out
+
+
 def expand(design, cat, obj_index, tails):
     """-> (placements, cells, segments dict, route nodes, start segment)."""
     seq = [(n, bool(r)) for n, r in design["chain"]]
     close = tuple(design["start"]) if design.get("close") else None
     pl, end = chain.run(tuple(design["start"]), seq, close)
-    records = []
-    for p in pl:
+    geoms = [piece_geometry(p) for p in pl]
+    lengths = [g[0][-1][3] for g in geoms]
+    base = [sum(lengths[:k]) for k in range(len(pl))]
+    xs = crossings(pl, geoms)
+    carried, decks = set(), []
+    for k, j, x, z, hd, arc_low, arc_up in xs:
+        if abs(arc_low - lengths[k]/2) > 1600:
+            print("  WARNING: crossing sits %.0f from the UNDERP's centre (floor is +/-1600)" % (arc_low - lengths[k]/2))
+        xarc = base[j] + arc_up
+        for i in range(len(pl)):
+            if pl[i]["name"] != "UNDERP" and base[i] - CARRY <= xarc <= base[i] + lengths[i] + CARRY:
+                carried.add(i)
+        decks.append((x, z, hd - 90))
+        print("  crossing: UNDERP piece %d under piece %d (%s) at (%d, %d), deck heading %.1f, carried %s" % (k, j, pl[j]["name"], x, z, hd - 90, sorted(carried)))
+    def rec(p, bias=None):
         obj = obj_index[p["name"]]; b, f = tails.get(p["name"], (0, 0x1000))
-        records.append(placement_record(obj, p["m"], p["x"], 0, p["z"], b, f))
+        return placement_record(obj, p["m"], p["x"], 0, p["z"], b if bias is None else bias, f)
+    # stock's crossing trio is road (carried) -> cutting -> deck, adjacent and last
+    records = [rec(p) for i, p in enumerate(pl) if i not in carried and p["name"] != "UNDERP"]
     for s in design.get("scenery", []):
         obj = obj_index[s["name"]]; b, f = tails.get(s["name"], (0, 0x1000))
         records.append(placement_record(obj, heading_matrix(s.get("heading", 0)), s["x"], s.get("y", 0), s["z"], b, f))
+    records += [rec(pl[i], BIAS_CARRIED) for i in sorted(carried)]
+    records += [rec(p) for p in pl if p["name"] == "UNDERP"]
+    for x, z, hd in decks:
+        b, f = tails.get("XOVER", (-200, 0x1000))
+        records.append(placement_record(obj_index["XOVER"], heading_matrix(hd), x, 0, z, b, f))
     cells = cells_for(records, cat)
     samples, total = sample_chain(pl)
     segs = segment_records(samples, closed=bool(design.get("close")))
