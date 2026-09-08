@@ -1365,3 +1365,38 @@ rdtrack/compile.py turns it back.  Two layouts:
 The front region (0x00000-0x011D0) is carried verbatim: track records (whose
 owned fields are patched), route nodes, name strings and the still-unknown
 small blocks.  rdtrack/build.py stages a loose MAME set from a compiled image.
+
+## Pieces layer, R2, R3 (2026-09-07)
+
+**rdtrack/pieces.py** carries every measured part's entry/exit pose through
+its placement and matches ends: world A's 92 road placements knit into one
+74-piece speed+stunt graph plus a 6-piece side road and the 4-DOTLINE skidpad
+straight.  What stock's joints look like: 79 butt joints with gap median 41
+units (1 ft), kink median 0.42 deg, tail to 6.3 deg; 5 collinear OVERLAPS
+where a branch's end sits thousands of units into the straight it rejoins
+(rec 73 D10R1833 -> 2937 into DOTLINE 69; rec 23/21 overlap 3217; rec 14 ->
+3190 into ROAD2 12).  That is how the speed/stunt fork is built - no junction
+piece, just overlapping road.  Many joints are exit<->exit: pieces placed
+backwards (the left-hand-curve-is-a-rotated-right-hand-model rule).  Road
+placement headings sit on no angular grid (~30% land on any of 1/256 turn,
+1, 0.5, 0.1 deg): Atari's tool used free rotations.  RCURV/LCURV/DIP/FLOAT*
+are curve-warning signs, not road.  Autocross (world at track record 1) is a
+closed 18-piece C45R140 loop; Super Stunt's road recognises as a 34-piece
+chain plus fragments (the stunt pieces are not measured yet).
+
+**R2 - DSP32C segment table capacity.**  RAM is 0x600000-0x63FFFF; the table
+loads at 0x614000 and the program references a fixed buffer at 0x61F600
+(dsp32_hi.dasm 0x0fbe4/0x0fcf4), so the table has 0xB600 bytes = 728 records
+including the header: **727 segments**.  Super Stunt's 725 sits 2 under it.
+Cap the compiler at 720.
+
+**R3 - cell membership.**  Not a clean rule.  Everything stock lists is within
+the object's catalogue cull distance of the cell box (0 exceptions over all
+three worlds), but the lists are tighter than that by ~25% (521 of 2068 refs
+in world A) in a way that no catalogue field, no per-object threshold and no
+distance-from-the-road-in-the-cell reproduces (a Super Stunt cell with no
+road in it still lists objects).  Most likely a visibility precomputation in
+Atari's tool.  Compiler rule: **list an object in every cell whose box is
+within the object's cull distance** - a strict superset of stock, safe, at
+the cost of ~30 more gather copies per cell per frame.  Tighten later if the
+68010 budget ever shows it.

@@ -76,8 +76,8 @@ VIR.md the earlier world/map work.  This file is the roadmap.
 | # | Question | Why it matters | Way in |
 |---|----------|----------------|--------|
 | R1 | What else references world A besides the three track records: attract-mode demo (recorded inputs?), "BEAT x:xx" default times, speed/stunt junction logic, pit/start scenery | whole-world replacement must not break the front end | disassembly around the track records; taps on 0x900D54 and the route walker while attract runs |
-| R2 | DSP32C segment-table capacity (its copy at 0x614000, 64 B/record) | hard ceiling on segments per world | DSP RAM map from the schematic/MAME; upload loop in the 68010 |
-| R3 | Cell grid bounds and how a placement is binned into the cells (grid shape is data: 4x4 for A/B, 1 cell for autocross) | defines the drawable world and the cell-list writer | the cell headers vs. stock placements |
+| R2 | ~~DSP32C segment-table capacity~~ DONE: 727 segments (table 0x614000-0x61F600); compiler caps at 720 | hard ceiling on segments per world | found in dsp32_hi.dasm |
+| R3 | ~~Cell binning~~ DECIDED: stock's lists are an unreproducible ~25% tightening of "within cull distance of the cell box"; the compiler uses the superset rule | defines the cell-list writer | see NOTES.md |
 | R4 | Drone path table: where, format, size per lap, how replay deviates | new tracks need new drones; budget | write-tap the mover block at 0x809400 (0x021B88 / 0x2162A), follow state to ROM |
 | R5 | ~~Every road piece's true geometry~~ DONE (rdtrack/parts.py -> parts.json); stunt pieces still need a 3D treatment | the parts library must be complete and trustworthy | measured from the object ROM by tool |
 | R6 | Terrain/horizon/sky and the ground colour outside placements | what a blank world looks like | placement-free build and look |
