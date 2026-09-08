@@ -30,7 +30,7 @@ def main(argv=None):
     tails = {nm: c.most_common(1)[0][0] for nm, c in cnt.items()}
 
     design = json.load(open(args.design))
-    recs, cells, segs, nodes, pl, samples = worldgen.expand(design, cat, obj_index, tails)
+    recs, cells, segs, nodes, pl, samples, entities = worldgen.expand(design, cat, obj_index, tails)
     if len(segs["segs"]) > 720:
         sys.exit("too many segments: %d (DSP32C table holds 727)" % len(segs["segs"]))
     doc = document.decompile(buf)
@@ -39,6 +39,8 @@ def main(argv=None):
     doc["segments"]["A"] = segs
     doc["routes"]["R0"] = {"nodes": nodes}
     doc["tracks"][0]["routes"] = ["R0", "R0"]
+    doc["tracks"][0]["entities"] = [entities, entities]
+    doc["tracks"][0]["entities_at"] = [None, None]
     img, L = comp.compile_doc(doc, fixed=False)
     top = max(b for a, b in L.used)
     print("%d placements, %d segments (start %d), %d route sections; image top 0x%05X, %d bytes free" % (

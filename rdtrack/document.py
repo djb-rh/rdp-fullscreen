@@ -26,8 +26,18 @@ def decompile(buf):
     sid = {a: "ABC"[i] for i, a in enumerate(D.segs)}
     rid = {a: "R%d" % i for i, a in enumerate(D.routes)}
     nid = {a: "N%d" % i for i, a in enumerate(D.names)}
+    def entities(a):
+        out = []
+        while True:
+            name_at, typ = dsk.off(dsk.u32(buf, a)), dsk.u16(buf, a + 4)
+            x, y, z = (dsk.s32(buf, a + 6 + 4*k) for k in range(3))
+            out.append({"name_at": name_at, "type": typ, "x": x, "y": y, "z": z, "w18": dsk.u32(buf, a + 0x12), "heading": dsk.u16(buf, a + 0x16)})
+            if typ == 0:
+                return out
+            a += 24
     for i, t in enumerate(D.tracks):
-        doc["tracks"].append({"slot": i, "record": t["raw"].hex(),
+        ent_at = [dsk.off(dsk.u32(buf, t["at"] + 0x18)), dsk.off(dsk.u32(buf, t["at"] + 0x1C))]
+        doc["tracks"].append({"slot": i, "record": t["raw"].hex(), "entities": [entities(a) for a in ent_at], "entities_at": ent_at,
                               "world": wid[t["descriptor"]], "segments": sid[t["segments"]],
                               "routes": [rid[h] for h in t["route"]], "names": nid[t["names"]],
                               "awards": t["awards"],

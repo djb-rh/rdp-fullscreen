@@ -25,12 +25,22 @@ def parts():
 
 
 def ends(name, rev=False):
-    """(entry (x, z, h), exit (x, z, h)) in model coordinates, for the driving direction."""
+    """(entry (x, z, h), exit (x, z, h)) in model coordinates, for the driving direction.
+
+    Positions are the measured end cross-sections.  The exit heading is the
+    entry heading plus the DESIGN turn where the name decodes one (45 for
+    C4572, not its measured 44.24): the models' end edges are skewed up to a
+    degree, and chaining by those skews made a 270-degree loop turn 265 and a
+    figure-8 miss by 2865 units.  Stock chains by design angles and wears the
+    skew as a small wedge at each seam; so do we."""
     p = parts()[name]
     e, x = p["entry"], p["exit"]
+    turn = ((x[2] - e[2] + 180) % 360) - 180
+    if "design" in p:
+        turn = math.copysign(p["design"]["turn"], turn) if abs(turn) > 0.5 else 0.0
     if not rev:
-        return (e[0], e[1], e[2]), (x[0], x[1], x[2])
-    return (x[0], x[1], (x[2] + 180) % 360), (e[0], e[1], (e[2] + 180) % 360)
+        return (e[0], e[1], e[2]), (x[0], x[1], e[2] + turn)
+    return (x[0], x[1], (x[2] + 180) % 360), (e[0], e[1], (x[2] + 180) % 360 - turn)
 
 
 def place(pose, name, rev=False):

@@ -250,9 +250,22 @@ def expand(design, cat, obj_index, tails):
         seg = first_seg[r["piece"]] + 1                   # segment index (record 0 is the header)
         nodes.append({"value": seg + BIAS - 1, "value2": seg + BIAS - 1, "w4": 0,
                       "flags": (r.get("marker", 0) << 12) | (r.get("type", 0) << 8) | r.get("name", 1), "wE": 0, "w16": 0, "prev": "self" if not nodes else len(nodes) - 1})
+    # start line and gates: at the route's start/gate sections, facing the travel heading
+    NAME_START, NAME_GATE = 0x0113C, 0x01146          # "STRTPOST" / "CHKPT" strings in the front region
+    entities = []
+    for r in design["route"]:
+        mk = r.get("marker", 0)
+        if mk not in (1, 4, 8):
+            continue
+        i = first_seg[r["piece"]]; s = samples[i]; nxt = samples[(i + 1) % len(samples)]
+        hd = math.degrees(math.atan2(nxt["x"] - s["x"], nxt["z"] - s["z"])) % 360
+        entities.append({"name_at": NAME_START if mk == 1 else NAME_GATE, "type": 1 if mk == 1 else 2,
+                         "x": int(round(s["x"])), "y": int(round(-s["elev"])), "z": int(round(s["z"])), "w18": 0, "heading": int(round(hd / 360 * 65536)) & 0xFFFF})
+    entities.sort(key=lambda e: -e["type"] if e["type"] == 1 else 0)     # start first, as stock
+    entities.append({"name_at": 0x01152, "type": 0, "x": 0, "y": 0, "z": 0, "w18": 0, "heading": 0})
     sp, so = design.get("start_piece", 0), design.get("start_offset", 0)
     start = first_seg[sp] + 1
     for i, s in enumerate(samples):
         if s["piece"] == sp and s["arc"] - samples[first_seg[sp]]["arc"] <= so:
             start = i + 1
-    return records, cells, {"bias": BIAS, "start": start, "header_raw": bytes(52).hex(), "segs": segs}, nodes, pl, samples
+    return records, cells, {"bias": BIAS, "start": start, "header_raw": bytes(52).hex(), "segs": segs}, nodes, pl, samples, entities

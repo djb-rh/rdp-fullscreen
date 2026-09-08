@@ -7,10 +7,6 @@
  "close": true,
  "chain": [
   [
-   "ROAD1",
-   0
-  ],
-  [
    "DOTLINE",
    0
   ],
@@ -23,10 +19,6 @@
    0
   ],
   [
-   "ROAD1",
-   0
-  ],
-  [
    "C4572",
    0
   ],
@@ -55,15 +47,7 @@
    0
   ],
   [
-   "DOTLHALF",
-   0
-  ],
-  [
-   "ROAD3",
-   0
-  ],
-  [
-   "DOTLHALF",
+   "DOTLINE",
    0
   ],
   [
@@ -103,22 +87,22 @@
    "name": 0
   },
   {
-   "piece": 8,
+   "piece": 6,
    "marker": 8,
    "name": 1
   },
   {
-   "piece": 13,
+   "piece": 10,
    "marker": 0,
    "name": 8
   },
   {
-   "piece": 18,
+   "piece": 15,
    "marker": 4,
    "name": 1
   },
   {
-   "piece": 21,
+   "piece": 17,
    "marker": 2,
    "name": 1
   }

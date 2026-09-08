@@ -97,6 +97,17 @@ def compile_doc(doc, fixed=False):
         for o, v in ((0x00, world_at[t["world"]]), (0x04, seg_at[t["segments"]]), (0x08, route_at[t["routes"][0]]),
                      (0x0C, route_at[t["routes"][1]]), (0x10, names_at[t["names"]]), (0x80, ba)):
             struct.pack_into(">I", raw, o, ptr(v))
+        # the positioned entities (start line, gates) per route: 24-byte entries, type 0 ends the list
+        if "entities" in t:
+            ent_at = {}
+            for r, ents in enumerate(t["entities"]):
+                want = t.get("entities_at", [None, None])[r]
+                if want in ent_at:
+                    ea = ent_at[want]
+                else:
+                    blob = b"".join(struct.pack(">IHiiiIH", ptr(e["name_at"]), e["type"], e["x"], e["y"], e["z"], e.get("w18", 0), e["heading"]) for e in ents)
+                    ea = L.place(len(blob), want); buf[ea:ea + len(blob)] = blob; ent_at[want] = ea
+                struct.pack_into(">I", raw, 0x18 + 4*r, ptr(ea))
         for m in range(4):
             for k in range(4):
                 struct.pack_into(">H", raw, 0x40 + (m*4 + k)*2, t["awards"][m][k])
