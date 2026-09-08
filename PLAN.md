@@ -78,14 +78,14 @@ VIR.md the earlier world/map work.  This file is the roadmap.
 | R1 | What else references world A besides the three track records: attract-mode demo (recorded inputs?), "BEAT x:xx" default times, speed/stunt junction logic, pit/start scenery | whole-world replacement must not break the front end | disassembly around the track records; taps on 0x900D54 and the route walker while attract runs |
 | R2 | ~~DSP32C segment-table capacity~~ DONE: 727 segments (table 0x614000-0x61F600); compiler caps at 720 | hard ceiling on segments per world | found in dsp32_hi.dasm |
 | R3 | ~~Cell binning~~ DECIDED: stock's lists are an unreproducible ~25% tightening of "within cull distance of the cell box"; the compiler uses the superset rule | defines the cell-list writer | see NOTES.md |
-| R4 | Drone path table: where, format, size per lap, how replay deviates | new tracks need new drones; budget | write-tap the mover block at 0x809400 (0x021B88 / 0x2162A), follow state to ROM |
+| R4 | ~~Drone path table~~ DECODED: main ROM 0x0A0000-0x0BFFFF, 56-byte header + 12-byte keyframes (dx,dy,dz,pitch,roll,heading) at 0.2 s; per-track list via track record +0x8C and the 0x00BFC block (that list's layout still partly open) | new tracks need new drones; budget 60 B/drone-second | see NOTES.md R4 |
 | R5 | ~~Every road piece's true geometry~~ DONE (rdtrack/parts.py -> parts.json); stunt pieces still need a 3D treatment | the parts library must be complete and trustworthy | measured from the object ROM by tool |
 | R6 | Terrain/horizon/sky and the ground colour outside placements | what a blank world looks like | placement-free build and look |
 | R7 | Track-select strings and any per-track text in the main ROM | optional renaming of slots | string search |
 
 ## Phases
 
-### Phase 0 - the library (rdtrack/)  [started 2026-09-06: dsk.py round-trips stock, parts.json written]
+### Phase 0 - the library (rdtrack/)  [2026-09-06/07: dsk.py round-trips stock, parts.json written, pieces.py recognises stock chains]
 Deliverable: a Python package that reads and writes every DSK structure above,
 proven by a **byte-identical round trip of both stock worlds**, plus a parts
 library generated from the object ROM (`parts.json`: entry/exit poses, hands,

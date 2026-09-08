@@ -1400,3 +1400,57 @@ Atari's tool.  Compiler rule: **list an object in every cell whose box is
 within the object's cull distance** - a strict superset of stock, safe, at
 the cost of ~30 more gather copies per cell per frame.  Tighten later if the
 68010 budget ever shows it.
+
+## R4 - drone paths, decoded (2026-09-07)
+
+Found by tapping the mover block and reading registers in the tap callback
+(MAME Lua: `cpu.state["PC"].value`, `cpu.state["A1"].value` inside an
+install_write_tap callback give the writer's PC and registers - the reported
+PC is the address AFTER the writing instruction).
+
+**Movers.**  A linked list headed at RAM 0x900C5E, 70 (0x46) bytes each,
+player at 0x900044: +0x00/+0x04/+0x08 position, +0x0C object-table pointer
+(0x435BE + 28*obj), +0x10 3x3 matrix, +0x34 flags, +0x3A its 50-byte slot in
+the 0x809400 block, +0x3E partner mover, +0x42 next.  In a race world A has 27:
+six drones (CAR1, TRUK3, VAN, VET3, POR, CAR2) each with a *STOP partner
+(parked model), CAR2A, the two CHECKPOINT GATES (CHKPT movers at (138000,0,
+261480) and (182640,0,131520) - the gates are movers, not placements),
+LITEGRN/STRTPOST, GRHORIZ (the horizon, rides with the car), PIC/FER unused.
+0x10000000 in a position = parked/inactive.
+
+**Replay struct** (RAM ~0x901F58, 0x76 apart, one per drone):
+    +0x00 current keyframe pointer (main ROM)      +0x04/+0x08/+0x0C base x/y/z
+    +0x10/+0x12/+0x14 this keyframe's dx/dy/dz     +0x16 current 3x3, +0x28 next 3x3
+    +0x3A mover   +0x3E descriptor (RAM 0x902486 + 22*i: start, end, current,
+    +0x0C start again, +0x10 loop-restart, +0x14 stride 12)   +0x52 path header
+Interpolator 0x036282: mover pos = base + delta * ((now - t0) << 14) / 50:
+**one keyframe per 50 clock units = 0.2 s** (12 frames).  Loader 0x0360F0:
+base += delta; delta = next record; at the end pointer the descriptor's
+loop-restart pointer wraps it (0x03AB58), and if the path is exhausted the
+deltas aim at the header's start position instead (rejoin).
+
+**Path in main ROM** (the 1012/1011 pair, 0x0A0000-0x0BFFFF, the ROMs that
+never changed revision): a 56-byte header then 12-byte keyframes:
+    header +0x00 type (1 = drone)   +0x1C total keyframes   +0x1E run-in count
+           +0x20/+0x24/+0x28 start position   +0x2C/+0x30/+0x34 parked position
+           +0x0C.. a 3x3-ish block (initial orientation)
+    keyframe: dx, dy, dz (s16, per 0.2 s), pitch, roll (s16, small), heading
+              (u16, 1/65536 turn - checked against atan2(dx, dz), the few
+              degrees of difference being the car's slip)
+Run-in keyframes (from the parked spot to the racing line) are played once;
+the lap section repeats from keyframe `run-in`.  Drone 1 (0x0A0000): 47 run-in
++ 452 lap = 90.4 s, lap closes to (-389, -33, 1), path length 436489 units
+(3.33 km), mean 82 mph.  Track 0's six drones: 0x0A0000 (500), 0x0A2598 (567),
+0x0A4B30 (523), 0x0A70C8 (566), 0x0A9660 (444, starts mid-track at (160920,
+150934) - oncoming), 0x0AE190 (460, oncoming).  0x0B2CC0 and 0x0B9D88 are
+1549-keyframe, no-run-in, zero-start recordings referenced from the champion
+records: the **PHANTOM PHOTON / HELEN WEALES ghost laps**.  0x0B77F0 (201) is
+autocross's drone.  Track record +0x8C -> the track's first path; the
++0x90 block (80 bytes per track at DSK 0x00B0C/0x00B5C/0x00BAC) is the
+champion record (name, time 0x5AD2 = 93.0 s, parameters) and the list at
+0x00BFC.. carries the path/ghost pointers per track - not fully decoded.
+
+**Budget.**  60 bytes per drone-second; six drones on a 3-minute lap = 65 KB
+of the 128 KB region, plus 18.6 KB per ghost lap.  Recording in MAME = log
+position, heading, pitch, roll every 12 frames (rd.lua already logs per
+frame), difference into keyframes, prepend a run-in from the parked spot.
