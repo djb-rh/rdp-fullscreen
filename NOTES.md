@@ -1340,3 +1340,28 @@ slightly different vertices; banked pieces (BANK 90 deg, BANKED1 180 deg
 hairpin) lift the outer edge so their plan view is not circular; SWEEPER is
 the unbanked BANK.  Stunt pieces (RAMP1, HLOOP, LAUNCH, JPART, JLAND, TUBE,
 CORKS) are classed but not yet measured meaningfully; CHKPT is the gate arch.
+
+## Phase 1, raw level (2026-09-07): decompile / compile round trip
+
+rdtrack/document.py turns the DSK image into a track document (JSON) and
+rdtrack/compile.py turns it back.  Two layouts:
+
+* `--fixed` puts every structure at the offset it came from: the compiled
+  image is BYTE-IDENTICAL to stock (0 differing bytes) once two things are
+  carried as data - route nodes' `prev` links, which are not the mirror of
+  `next` (heads point at themselves, and route A's head points at an orphan
+  node at 0x004DE in the front region), and the 50-byte terminator record
+  (object 0xFFFF) that follows every placement array.
+* fresh: everything above 0x011D0 laid out again from scratch with every
+  pointer regenerated (worlds, grids, cell lists, segment tables, +0x80
+  blocks move; route nodes / name tables / strings stay in the verbatim front
+  region when unchanged).  Re-parses with 0 mismatches and decompiles to the
+  same document.  MAME attract mode run headless on stock and on the
+  relocated image with identical inputs gives PIXEL-IDENTICAL frames at
+  300/900/1500/2100/2700/3300 - the demo drives Super Stunt from relocated
+  data - so nothing in the game holds an absolute address to these
+  structures other than the track-record pointers we regenerate.
+
+The front region (0x00000-0x011D0) is carried verbatim: track records (whose
+owned fields are patched), route nodes, name strings and the still-unknown
+small blocks.  rdtrack/build.py stages a loose MAME set from a compiled image.

@@ -93,7 +93,7 @@ lane count, elevation profile, catalogue radius, class = road/bridge/deck/
 scenery/gate).  Resolves R5.  Consolidates patch_track/patch_segments/
 patch_route/patch_awards/mkseg/layout/world into one namespace with tests.
 
-### Phase 1 - the round trip
+### Phase 1 - the round trip  [raw level done 2026-09-07: fixed layout byte-identical, relocated layout pixel-identical in MAME attract mode]
 Deliverable: `decompile` stock world A into a track document; `compile` it
 back; the result drives identically with stock drones on it.  Anything that
 does not round-trip is a field we do not understand yet.  Resolves R1-R3 as
