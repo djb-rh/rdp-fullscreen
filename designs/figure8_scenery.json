@@ -1,0 +1,205 @@
+{
+ "start": [
+  150000,
+  150000,
+  90.0
+ ],
+ "close": true,
+ "chain": [
+  [
+   "DOTLINE",
+   0
+  ],
+  [
+   "UNDERP",
+   0
+  ],
+  [
+   "DOTLINE",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "DOTLINE",
+   0
+  ],
+  [
+   "DOTLINE",
+   0
+  ],
+  [
+   "DOTLINE",
+   0
+  ],
+  [
+   "C4572",
+   1
+  ],
+  [
+   "C4572",
+   1
+  ],
+  [
+   "C4572",
+   1
+  ],
+  [
+   "C4572",
+   1
+  ],
+  [
+   "C4572",
+   1
+  ],
+  [
+   "C4572",
+   1
+  ]
+ ],
+ "scenery": [
+  {
+   "name": "SORS",
+   "piece": 0,
+   "arc": 1200,
+   "side": 0,
+   "heading": 0
+  },
+  {
+   "name": "BARRIER",
+   "piece": 0,
+   "arc": 3000,
+   "side": 1300,
+   "heading": 0
+  },
+  {
+   "name": "BARRIER",
+   "piece": 0,
+   "arc": 3900,
+   "side": 1300,
+   "heading": 0
+  },
+  {
+   "name": "HOUSE",
+   "piece": 2,
+   "arc": 9000,
+   "side": -3200,
+   "heading": 0
+  },
+  {
+   "name": "COW",
+   "piece": 2,
+   "arc": 12000,
+   "side": 1800,
+   "heading": 60
+  },
+  {
+   "name": "HILL1",
+   "piece": 5,
+   "arc": 8000,
+   "side": 9000,
+   "heading": 0
+  },
+  {
+   "name": "BARN",
+   "piece": 9,
+   "arc": 6000,
+   "side": 2800,
+   "heading": 90
+  },
+  {
+   "name": "STORE",
+   "piece": 10,
+   "arc": 8000,
+   "side": -3400,
+   "heading": 0
+  },
+  {
+   "name": "COW",
+   "piece": 10,
+   "arc": 3000,
+   "side": 1600,
+   "heading": -30
+  },
+  {
+   "name": "COW",
+   "piece": 10,
+   "arc": 3600,
+   "side": 2100,
+   "heading": 20
+  },
+  {
+   "name": "DGREEN",
+   "piece": 14,
+   "arc": 8000,
+   "side": -11000,
+   "heading": 0
+  },
+  {
+   "name": "LBROWN",
+   "piece": 7,
+   "arc": 4000,
+   "side": -12000,
+   "heading": 0
+  },
+  {
+   "name": "TRAIN",
+   "piece": 11,
+   "arc": 12000,
+   "side": 3000,
+   "heading": 0
+  }
+ ],
+ "route": [
+  {
+   "piece": 0,
+   "marker": 1,
+   "name": 0
+  },
+  {
+   "piece": 6,
+   "marker": 8,
+   "name": 1
+  },
+  {
+   "piece": 10,
+   "marker": 0,
+   "name": 8
+  },
+  {
+   "piece": 15,
+   "marker": 4,
+   "name": 1
+  },
+  {
+   "piece": 17,
+   "marker": 2,
+   "name": 1
+  }
+ ],
+ "start_piece": 0,
+ "start_offset": 0,
+ "auto_signs": true
+}

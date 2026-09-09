@@ -277,9 +277,13 @@ def expand(design, cat, obj_index, tails):
         return placement_record(obj, p["m"], p["x"], 0, p["z"], b if bias is None else bias, f)
     # stock's crossing trio is road (carried) -> cutting -> deck, adjacent and last
     records = [rec(p) for i, p in enumerate(pl) if i not in carried and p["name"] != "UNDERP"]
-    for s in design.get("scenery", []):
-        obj = obj_index[s["name"]]; b, f = tails.get(s["name"], (0, 0x1000))
-        records.append(placement_record(obj, heading_matrix(s.get("heading", 0)), s["x"], s.get("y", 0), s["z"], b, f))
+    from . import scenery
+    def place(obj, hd, x, y, z, b, f):
+        return placement_record(obj, heading_matrix(hd), x, y, z, b, f)
+    srecs, warnings = scenery.expand(design, pl, geoms, obj_index, tails, scenery.bboxes(), place)
+    for wmsg in warnings:
+        print("  WARNING:", wmsg)
+    records += srecs
     records += [rec(pl[i], cbias.get(i, BIAS_CARRIED)) for i in sorted(carried)]
     records += [rec(p, BIAS_UNDERP) for p in pl if p["name"] == "UNDERP"]
     for x, z, hd in decks:

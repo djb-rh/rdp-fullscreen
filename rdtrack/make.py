@@ -23,11 +23,15 @@ def main(argv=None):
     w = W.World(); cat = {i: w.catalogue(i) for i in range(390)}; obj_index = {w.name(i): i for i in range(156)}
     buf = dsk.load(args.romset)
     D = dsk.Dsk(buf)
-    A = D.worlds[D.tracks[0]["descriptor"]]
+    # per-object (bias, flags) as stock uses them, world A first, then B and autocross
     cnt = collections.defaultdict(collections.Counter)
-    for p in A["placements"]:
-        cnt[w.name(p["obj"])][(p["bias"], p["flags"])] += 1
+    for ti in (0, 2, 1):
+        for p in D.worlds[D.tracks[ti]["descriptor"]]["placements"]:
+            cnt[w.name(p["obj"])][(p["bias"], p["flags"])] += 1
     tails = {nm: c.most_common(1)[0][0] for nm, c in cnt.items()}
+    if not os.path.exists("objects.json"):
+        from . import scenery
+        scenery.catalogue(w, {"A": D.worlds[D.tracks[0]["descriptor"]], "B": D.worlds[D.tracks[2]["descriptor"]], "AX": D.worlds[D.tracks[1]["descriptor"]]})
 
     design = json.load(open(args.design))
     recs, cells, segs, nodes, pl, samples, entities = worldgen.expand(design, cat, obj_index, tails)

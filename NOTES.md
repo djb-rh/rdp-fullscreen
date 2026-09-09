@@ -1681,3 +1681,45 @@ design's world (the demo's recorded inputs drive it into the grass, as
 expected until the demo/ghost recording is ours too - the 1549-keyframe
 recordings at 0x0B2CC0/0x0B9D88 are the candidates).  Round trip: 0
 mismatches, 1 world / 1 table / 1 route in the image.
+
+## Scenery in the design format (2026-09-09)
+
+rdtrack/scenery.py places everything that is not road.  Design entries are
+track-relative ({"name","piece","arc","side","heading"}: arc along the piece
+from its entry, side + right / - left of the centreline, heading relative to
+travel, y = the road's elevation there + "dy") or absolute ({"x","z",
+"heading","y"}); kits are composites ("curve_sign" = LCURV/RCURV + FLOATnn at
+one pose, "speed_sign" = FLOATnn + SIGNPOST turned 180); "auto_signs": true
+puts a curve_sign 1400 before every run of curves on the right, speed from the
+piece's radius (>= 25000 units 90, >= 15000 60, else 40).  objects.json is the
+editor palette: every object with class, radius/cull, vertex and face counts,
+model bbox and stock use.
+
+Stock conventions measured from world A (offsets against the nearest segment,
+lateral + = right of travel, rel = placement heading - travel heading):
+curve signs RCURV/LCURV at lateral +900..+1600 (median 1160), rel 0, the
+FLOAT number at the same pose with bias -113..-156; SIGNPOST under a lone
+number at rel 180; GRDARROW on the left (-400..-1300) at rel 0 / -22; hills
+3000-5600 out with bias +200/+400 and y 0 even where the road is raised;
+houses/stores on the right at +400..+700 rel 0 (their fronts face model -x);
+ground squares (19.6k on a side) anywhere, a few pushed back with bias
+23000-27000; barriers across road stubs; scenery y follows the road's
+elevation (y = 1600 on the raised section).  Signs, cones, cows and the like
+carry flags 0x9000, everything else 0x1000.
+
+Two rules learned from the first scenery build (designs/figure8_scenery.json):
+a building on the LEFT must be turned 180 (default now) - seen from behind
+STORE is an open shell with a sign pole; and HILL1's footprint is 26k x 19k
+with the road meant to run over its flat base, so a hill "beside" the road
+needs side >= 9000 or it swallows the verge.  The compiler warns when a
+building/prop/sign/vehicle footprint reaches within 800 of the centreline at
+road level (banners and gantries exempt).
+
+Static views (experiments/variant_start.py + experiments/static_snap.lua)
+need the route section forced to the start segment (0x900D54 = seg + 69
+during frames 1000-1180): left alone the game keeps the route's start
+section and walks forward to the first segment whose along-range holds the
+car - on the figure-8 that is the UNDERP's, so the camera sits on the cutting
+floor (y -571) with OFF ROAD.  Snapshots verified: SORS gantry over the
+start, barriers, HOUSE/BARN/STORE, cows, TRAIN, HILL1, both auto curve signs
+with their 90s, the gate posts.

@@ -101,7 +101,7 @@ does not round-trip is a field we do not understand yet.  Resolves R1-R3 as
 side effects and starts R4 (drone table located and decoded, budget measured).
 This is the highest-information step and the one to start with.
 
-### Phase 2 - the first custom track  [DONE 2026-09-08; underpass crossing DONE 2026-09-08 (R8); one world / all slots DONE 2026-09-09; scenery and drones still to do]
+### Phase 2 - the first custom track  [DONE 2026-09-08; underpass crossing DONE 2026-09-08 (R8); one world / all slots DONE 2026-09-09; scenery DONE 2026-09-09 (rdtrack/scenery.py, objects.json, designs/figure8_scenery.json); drones still to do]
 Deliverable: a hand-written document (an oval with one banked turn and a
 bridge, say) compiled from blank, all three slots pointing at it, driven in
 MAME and on hardware.  Proves whole-world replacement, R1's answers, and the
@@ -111,7 +111,7 @@ validator's budgets against a real build.  Includes the first recorded drone.
 Local web app served by Python:
 * palette of parts from `parts.json`; snap-chain placement; hand flip; closure
   solver with the residual shown per joint;
-* scenery placement on a grid, elevation-aware (bridges, cuttings);
+* scenery placement on a grid, elevation-aware (bridges, cuttings) - the format exists (scenery.py: track-relative poses, kits, auto signs, road-overlap warning, objects.json palette); the UI drags it;
 * route/gate tool: sections in order, gate markers, awards; start pose;
 * drone tool: record (export -> drive in MAME -> import log) or synthesise;
 * validator panel: capacity budgets, hand-off slack, ownership ranges on relief
