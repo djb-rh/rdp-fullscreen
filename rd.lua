@@ -160,6 +160,16 @@ local SNAP = os.getenv("SNAP")
 local snap_lo, snap_hi = nil, nil
 if SNAP then snap_lo, snap_hi = SNAP:match("^(%d+)%-(%d+)$"); snap_lo = tonumber(snap_lo); snap_hi = tonumber(snap_hi)
   print(string.format("[rd] SNAP: snapshots while on segments %d..%d", snap_lo, snap_hi)) end
+-- REC=file: dump the game's own lap recording (RAM 0x90A800.., the drone-path
+-- format, with the write pointer 0x9051FE appended) every 2 s and at exit, for
+-- rdtrack.drones.from_recording.
+local REC = os.getenv("REC")
+local function rec_dump()
+  if not REC then return end
+  local f = io.open(REC, "wb")
+  if f then f:write(sp:read_range(0x90A800, 0x90CD97, 8)); f:write(sp:read_range(0x9051FE, 0x905201, 8)); f:close() end
+end
+if REC then print("[rd] REC: dumping the lap recording to " .. REC) end
 local LOGGING = os.getenv("LOG") == "1"
 local logf = LOGGING and io.open("drive_log.csv", "w") or nil
 if logf then
@@ -266,6 +276,7 @@ end
 local function logline(frames)
   if not logf then return end
   rlogline(frames)
+  if REC and frames % 120 == 0 then rec_dump() end
   local function u16(a) local ok,v = pcall(function() return sp:read_u16(a) end); return ok and v or -1 end
   local function s16(a) local v = u16(a); if v >= 0x8000 then v = v - 0x10000 end; return v end
   local function s32(a) local ok,v = pcall(function() return sp:read_u32(a) end)

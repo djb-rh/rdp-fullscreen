@@ -1723,3 +1723,68 @@ car - on the figure-8 that is the UNDERP's, so the camera sits on the cutting
 floor (y -571) with OFF ROAD.  Snapshots verified: SORS gantry over the
 start, barriers, HOUSE/BARN/STORE, cows, TRAIN, HILL1, both auto curve signs
 with their 90s, the gate posts.
+
+## Drones: the whole mechanism, and a recorder (2026-09-09)
+
+The 68010 disassembly (MAME `-debug -debugger none` + a Lua `dasm` command,
+dasm/main68k.dasm, gitignored) settled R4.  A track's paths are an array of
+0x2598-byte SLOTS (56-byte header + up to 797 keyframes) from track +0x8C:
+slot k = first + k*0x2598 (0x035F94).  Stock: track 0 slots 0-7 drones + the
+PHANTOM PHOTON ghost in slots 8-9 (1549 keyframes span two slots), autocross
+slots 10-12, super stunt 13-15; 16 slots = 0x0A0000-0x0C5980 (ROM pairs
+1012/1011 and 1014/1013).  The +0x9C table (18 B at DSK 0x00C7A/0x00C8C/
+0x00C9E): slot count, slot 0, drone-list count, list ptr, ptr, w.  The 42-byte
++0xA0 table (0x00BFC/0x00C26/0x00C50): +2 slot 0, +8 the list, +0x20 the
+ghost slot, +0x26 the champion's car-name string.  Drone list (14 B: kind,
+name-string ptr, slot, param, flags, 0x0307) at 0x00CB0 (10 entries for
+track 0; autocross 0x00D3C and super stunt 0x00DC8 have one each): kind 1
+(CAR2/POR/VET3/CAR2A, slots 0-3) grid drones; kind 3 (VAN/TRUK3/CAR1, slot 6,
+params 250/225/95 = keyframe already reached) oncoming traffic; kind 2 (VAN/
+CAR1/PIC, slot 5, params 150/300/450) released later; kind 4 = the champion
+ghost (the RAM path for autocross, a type-0 path for super stunt).  Attract
+mode replays SLOT 0 (0x02DC9C copies it to RAM), not the ghost.
+
+Header: +0 type, +2 8-byte label (ghost "CAR1\0PI"), +0xA 3x3 initial matrix
+(placement convention), +0x1C total, +0x1E run-in, +0x20 start (where the
+loop begins), +0x2C parked.  Descriptor (0x03AAF2): start/end/cur/loop-restart
+(= run-in); next (0x03AB58) wraps past the end to the run-in; prev (0x03AB26)
+stops at the path start (no wrap).  At the green light every drone is
+rewound `countdown/50` keyframes from `start` (0x03785E), so the run-in is
+where the grid line-up comes from.  Loader 0x0360E8: base += delta, next
+keyframe; interpolator 0x036282: pos = base + delta*(t - t0)/50.  Each
+drone's time (+0x42) advances at rate +0x4A (8.8, 0x100 = real time) chasing
+target +0x4C set by 0x039A70 - THE RUBBER BAND: with the player's route
+progress (0x9016BE = lap*64 + nodes entered) against the drone's (+0x56):
+drone ahead and > 40000 units away -> 0x20 (crawl), 30000-40000 -> 0x80,
+20000-30000 -> 0xC0, nearer -> 0x901684 (tracks the player's speed, 0 when
+the player is stopped), drone behind -> 0x200 (catch up).  A stationary
+player therefore sees every drone crawl once 40000 ahead - normal.
+
+**Keyframes carry hidden data**: pitch bits 0-2 << 3 | heading bits 0-2 =
+the route-node count at that keyframe (the drone's +0x56 low 6 bits; when it
+drops, +0x56 += 64 = next lap), roll bit 0 -> mover +0x22.  Random low bits
+make a drone look ahead/behind at random; rdtrack.drones encodes the count
+the way the player's walker (0x02EF3C) counts: +1 per node entered after the
+start node, the finish rounds up to the next 64.
+
+**The game records the player** in the same format at RAM 0x90A800 (write
+pointer 0x9051FE, header type/total written at lap end by 0x036ED4, run-in =
+keyframe nearest the line by 0x036C7C..; the ROM write-back at 0x037E42
+is what made autocross's "race your own lap" and never touches ROM).  rd.lua
+REC=file dumps it; drones.from_recording cuts one lap from it.
+
+rdtrack/drones.py: Path encode/decode, from_centreline (synthesised lap at a
+speed and lane, run-in accelerating from a grid spot or a pre-roll of the
+lap's tail, closure fixed to the unit), from_recording, install (slots into
+the 68010 image, all three track records and tables pointed at them, list
+rewritten), plan (design "drones": count/speed(s)/cars/oncoming/
+oncoming_speed).  build.stage rewrites ROM pairs 1012/1011 and 1014/1013.
+Verified headless on the figure-8: three grid drones line up beside/ahead of
+the player, drive the right lane through the underpass, obey the rubber
+band; two oncoming cars (kind 1 in their own slots, spread round the lap)
+crawl until the player nears, as the band dictates; attract mode drives our
+track.  Kind 3 placement put our cars 50000 units off the path at 2.5x
+speed - unresolved, so oncoming traffic is kind 1 for now (it will catch up
+at 2x once "behind" the player; stock avoids that with kind 3).  Not done:
+the ghost slot (champion challenge still replays PHANTOM PHOTON on our
+world), and the "BEAT" default time.

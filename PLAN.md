@@ -78,7 +78,7 @@ VIR.md the earlier world/map work.  This file is the roadmap.
 | R1 | What else references world A besides the three track records: attract-mode demo (recorded inputs?), "BEAT x:xx" default times, speed/stunt junction logic, pit/start scenery | whole-world replacement must not break the front end | disassembly around the track records; taps on 0x900D54 and the route walker while attract runs |
 | R2 | ~~DSP32C segment-table capacity~~ DONE: 727 segments (table 0x614000-0x61F600); compiler caps at 720 | hard ceiling on segments per world | found in dsp32_hi.dasm |
 | R3 | ~~Cell binning~~ DECIDED: stock's lists are an unreproducible ~25% tightening of "within cull distance of the cell box"; the compiler uses the superset rule | defines the cell-list writer | see NOTES.md |
-| R4 | ~~Drone path table~~ DECODED: main ROM 0x0A0000-0x0BFFFF, 56-byte header + 12-byte keyframes (dx,dy,dz,pitch,roll,heading) at 0.2 s; per-track list via track record +0x8C and the 0x00BFC block (that list's layout still partly open) | new tracks need new drones; budget 60 B/drone-second | see NOTES.md R4 |
+| R4 | ~~Drone path table~~ DONE 2026-09-09: 16 slots of 0x2598 B from 0x0A0000, the drone list/tables at DSK 0x00BFC-0x00E94 decoded, rubber band and keyframe node-count bits understood, rdtrack/drones.py synthesises/installs paths and imports the game's own RAM recording (rd.lua REC=) | new tracks need new drones | see NOTES.md 2026-09-09 |
 | R5 | ~~Every road piece's true geometry~~ DONE (rdtrack/parts.py -> parts.json); stunt pieces still need a 3D treatment | the parts library must be complete and trustworthy | measured from the object ROM by tool |
 | R6 | Terrain/horizon/sky and the ground colour outside placements | what a blank world looks like | placement-free build and look |
 | R7 | Track-select strings and any per-track text in the main ROM | optional renaming of slots | string search |
@@ -101,7 +101,7 @@ does not round-trip is a field we do not understand yet.  Resolves R1-R3 as
 side effects and starts R4 (drone table located and decoded, budget measured).
 This is the highest-information step and the one to start with.
 
-### Phase 2 - the first custom track  [DONE 2026-09-08; underpass crossing DONE 2026-09-08 (R8); one world / all slots DONE 2026-09-09; scenery DONE 2026-09-09 (rdtrack/scenery.py, objects.json, designs/figure8_scenery.json); drones still to do]
+### Phase 2 - the first custom track  [DONE 2026-09-08; underpass crossing DONE 2026-09-08 (R8); one world / all slots DONE 2026-09-09; scenery DONE 2026-09-09 (rdtrack/scenery.py, objects.json, designs/figure8_scenery.json); drones DONE 2026-09-09 (rdtrack/drones.py: synthesised laps, kind 3 and the ghost slot open)]
 Deliverable: a hand-written document (an oval with one banked turn and a
 bridge, say) compiled from blank, all three slots pointing at it, driven in
 MAME and on hardware.  Proves whole-world replacement, R1's answers, and the

@@ -9,7 +9,7 @@ format.  The stock zip is read, never written; the output is a complete loose
 MAME set at OUTDIR/racedriv plus the raw image OUTDIR/dsk_image.bin.
 """
 import argparse, collections, json, os, sys
-from . import dsk, document, worldgen, build
+from . import dsk, document, worldgen, build, scenery, drones
 from . import compile as comp
 
 
@@ -30,7 +30,6 @@ def main(argv=None):
             cnt[w.name(p["obj"])][(p["bias"], p["flags"])] += 1
     tails = {nm: c.most_common(1)[0][0] for nm, c in cnt.items()}
     if not os.path.exists("objects.json"):
-        from . import scenery
         scenery.catalogue(w, {"A": D.worlds[D.tracks[0]["descriptor"]], "B": D.worlds[D.tracks[2]["descriptor"]], "AX": D.worlds[D.tracks[1]["descriptor"]]})
 
     design = json.load(open(args.design))
@@ -56,11 +55,20 @@ def main(argv=None):
     for k in [k for k in doc["routes"] if k != "R0"]: del doc["routes"][k]
     for k in [k for k in doc["names"] if k != doc["tracks"][0]["names"]]: del doc["names"][k]
     img, L = comp.compile_doc(doc, fixed=False)
+    # drones: synthesised laps (or REC recordings later) in the main ROM, all slots pointed at them
+    track = scenery.Track(pl, [worldgen.piece_geometry(p) for p in pl], bool(design.get("close")))
+    player_arc = samples[segs["start"] - 1]["arc"]
+    bits_at = drones.node_counter(samples, nodes, segs["start"], track.total, segs["bias"])
+    paths, dentries = drones.plan(design, track, player_arc, bits_at)
+    main = build.main_image(args.romset)
+    nslots = drones.install(main, img, paths, dentries)
+    print("%d drone paths (%s keyframes), %d drones, %d slots" % (len(paths), "/".join(str(len(p.kf)) for p in paths), len(dentries), nslots))
     top = max(b for a, b in L.used)
     print("%d placements, %d segments (start %d), %d route sections; image top 0x%05X, %d bytes free" % (
         len(recs), len(segs["segs"]), segs["start"], len(nodes), top, comp.LIMIT - top))
-    out = build.stage(args.romset, img, args.out)
+    out = build.stage(args.romset, img, args.out, main)
     open(os.path.join(args.out, "dsk_image.bin"), "wb").write(bytes(img))
+    open(os.path.join(args.out, "main_image.bin"), "wb").write(bytes(main))
     print("staged %s\nrun:  mame racedriv -rompath %s   (choose the original track)" % (out, os.path.abspath(args.out)))
 
 
