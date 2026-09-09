@@ -38,9 +38,19 @@ def main(argv=None):
                           "placements": [{k: (v.hex() if isinstance(v, bytes) else v) for k, v in p.items()} for p in recs]}
     doc["segments"]["A"] = segs
     doc["routes"]["R0"] = {"nodes": nodes}
-    doc["tracks"][0]["routes"] = ["R0", "R0"]
-    doc["tracks"][0]["entities"] = [entities, entities]
-    doc["tracks"][0]["entities_at"] = [None, None]
+    # ONE WORLD (PLAN.md): every track slot - original / autocross / super stunt in
+    # the menu - runs the design's world with the design's route, so a build owns
+    # the whole DSK and stock's worlds B and C are not emitted (their space is
+    # free for the one world).  Per-slot leftovers kept from stock: the +0x80
+    # blocks, the champion records and the drone path pointers.
+    for t in doc["tracks"]:
+        t["world"] = "A"; t["segments"] = "A"; t["routes"] = ["R0", "R0"]; t["names"] = doc["tracks"][0]["names"]
+        t["awards"] = doc["tracks"][0]["awards"]
+        t["entities"] = [entities, entities]; t["entities_at"] = [None, None]
+    for k in [k for k in doc["worlds"] if k != "A"]: del doc["worlds"][k]
+    for k in [k for k in doc["segments"] if k != "A"]: del doc["segments"][k]
+    for k in [k for k in doc["routes"] if k != "R0"]: del doc["routes"][k]
+    for k in [k for k in doc["names"] if k != doc["tracks"][0]["names"]]: del doc["names"][k]
     img, L = comp.compile_doc(doc, fixed=False)
     top = max(b for a, b in L.used)
     print("%d placements, %d segments (start %d), %d route sections; image top 0x%05X, %d bytes free" % (

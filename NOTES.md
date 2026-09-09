@@ -1667,3 +1667,17 @@ Separate, pre-existing: from the FOOT of the exit ramp inside the cutting
 (segment 10, camera 666 below ground) the frame is all ground colour with
 either bias - the far wall's fill face seen from below the wall tops.  Not
 introduced here; stock's cutting has the same faces.  Left for later.
+
+## One world (2026-09-09)
+
+rdtrack.make now points all three track records at the design's world,
+segment table, route, name table and entity block, copies slot 0's award
+table to the others, and drops stock's worlds B/C and their tables from the
+document, so a build owns the DSK: the figure-8 image tops out at 0x04276
+with 97742 bytes free (was 31956 with B and C carried).  The per-slot +0x80
+blocks, champion records and drone-path pointers stay stock.  Attract mode,
+which switches to the Super Stunt slot at frame ~390, now demos on the
+design's world (the demo's recorded inputs drive it into the grass, as
+expected until the demo/ghost recording is ours too - the 1549-keyframe
+recordings at 0x0B2CC0/0x0B9D88 are the candidates).  Round trip: 0
+mismatches, 1 world / 1 table / 1 route in the image.
