@@ -246,10 +246,19 @@ def plan(design, track, player_arc, bits_at=None):
     speeds = d.get("speeds") or [d.get("speed", 70) - 4 * k for k in range(n_race)]
     cars = d.get("cars") or ["CAR2", "POR", "VET3", "CAR2A", "CAR1"]
     paths, entries = [], []
+    # recorded laps first: "recordings": ["my_lap.rec"] (rd.lua REC=my_lap.rec while driving a
+    # clean lap of this very design); the lap is cut at the start line and gets its own slot
+    for k, fn in enumerate(d.get("recordings", [])):
+        sx, _y, sz = track.at(player_arc)[0], 0, track.at(player_arc)[1]
+        p = from_recording(open(fn, "rb").read(), (sx, sz))
+        if bits_at:
+            _section_bits(p.kf[p.runin:], [player_arc + i * (track.total / max(1, len(p.kf) - p.runin)) for i in range(len(p.kf) - p.runin)], bits_at)
+        p.label = cars[k % len(cars)].encode()
+        paths.append(p); entries.append((1, cars[k % len(cars)], len(paths) - 1, 1))
     grid = [(player_arc + GRID[k % len(GRID)][0], GRID[k % len(GRID)][1]) for k in range(n_race)]
     for k in range(n_race):
         paths.append(from_centreline(track, speeds[k], LANE_RACE, player_arc + 20000, grid[k], cars[k % len(cars)].encode(), bits_at=bits_at))
-        entries.append((1, cars[k % len(cars)], k, 1))
+        entries.append((1, cars[k % len(cars)], len(paths) - 1, 1))
     v_on = max(d.get("oncoming_speed", 45), math.ceil(track.total / ((MAXKF - 40) * KF_S) / mph(1)))
     for k in range(n_on):
         phase = player_arc + track.total * (k + 1) / (n_on + 1)      # spread round the lap, away from the grid
