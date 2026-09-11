@@ -107,6 +107,12 @@ bridge, say) compiled from blank, all three slots pointing at it, driven in
 MAME and on hardware.  Proves whole-world replacement, R1's answers, and the
 validator's budgets against a real build.  Includes the first recorded drone.
 
+### Phase 2b - compact hardware with the Panorama's Stock Car track (pinned 2026-09-11)
+Feasible on the evidence in NOTES.md 2026-09-11: same worlds, same physics ROM,
+free main-ROM region where the Panorama keeps those drones, spare object
+socket pair.  Work: object port by name, name-table relocation, slot-1 rule
+audit (33 track-index sites), selector string, then slapfree.py.
+
 ### Phase 3 - the editor
 Local web app served by Python:
 * palette of parts from `parts.json`; snap-chain placement; hand flip; closure

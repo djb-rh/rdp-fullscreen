@@ -1788,3 +1788,53 @@ speed - unresolved, so oncoming traffic is kind 1 for now (it will catch up
 at 2x once "behind" the player; stock avoids that with kind 3).  Not done:
 the ghost slot (champion challenge still replays PHANTOM PHOTON on our
 world), and the "BEAT" default time.
+
+## Compact hardware + the Panorama's Stock Car track: feasibility (2026-09-11)
+
+Sets compared: racedriv (cockpit rev 5), racedrivc (compact rev 5, from the
+merged 0.258 set under racedrivc/), racedrivpan (Panorama proto 2.1).
+
+* **World data is one body of data.**  The compact DSK is the cockpit DSK
+  with 3 of 512 256-byte blocks changed: track 0's +0x20..+0x3F tuning words
+  (0x3C0/0x384/0x348/0x10C -> 0x3D4/0x3C0/0x384/0x148), autocross's award
+  table (30 -> 100) and one word at 0x011CE.  Every placement, segment and
+  route is identical.  The Panorama DSK (256 KB, 2 x 27C010 in the same DSK I
+  board - MAME's user3 region is 256 KB for all of them) carries the same
+  three worlds relocated plus a fourth track record: Stock Car, 149
+  placements, 369 segments, 38 route nodes, 6 drone slots + ghost.
+* **The DSP32 physics program is not in the DSK at all**: it sits in the last
+  main ROM pair (200y/210y) 32-bit-reversed, boot stub at 0x0E8C28 (cockpit
+  and Panorama share that pair, 136077-1016/4015 == 088-1016/1015); the
+  compact's copy (136078-4016/4015) is byte-identical from a 0x14C shift.
+  So Stock Car runs on the physics every variant already has.
+* **Room for the drones.**  Cockpit and compact are identical over
+  0x0A0000-0x0E0000; 0x0C5980-0x0E8C27 (~140 KB) has no absolute reference
+  from either program, and the Panorama puts Stock Car's six drones and ghost
+  exactly there (0x0C5980-0x0D8640) with the rest of the pair unchanged.
+  Treat it as free (an indirect reference is not excluded).
+* **Objects.**  The Panorama's table has 186 entries: the cockpit's 158 with
+  156/157 renamed POST25/POST35, then POST45/55, STOPPOST, YIELDPST, LPOST
+  and seven stock cars (CTF, CTF1-3, CTC1-2, CTV) each with STOP and W
+  (wreck) models, ~48 KB of models; index 184 (unnamed, radius 2878) is
+  used twice by the world.  The compact's ADSP object board has the third
+  socket pair empty (region 384 KB, 256 KB fitted), its catalogue has room
+  for 30 more records, and the object-name table (0x4362A on the compact,
+  158 x 28 B, referenced by 8 immediates) has no free bytes after it - it
+  moves whole into the free region.  The Panorama's object ROM is otherwise
+  reorganised (its first 128 KB differ from the cockpit's), so objects are
+  carried by name, not index.
+* **The compact program is the cockpit program with RAM shifted** (track
+  index at 0x901756 instead of 0x90173E, 33 loads either way); three
+  explicit "track == 1" (autocross) tests at 0x02F048/0x02F2A2/0x0388B2 plus
+  the +0x84/+0x94 mode words in the track record (Stock Car's equal the
+  speed track's, autocross's differ).  The audit of the 33 sites is the
+  remaining program work.
+* **Loose ends in the prototype itself**: Stock Car's entity block is a copy
+  of the speed track's (STRTPOST/CHKPT at the speed track's coordinates) and
+  its section-name table repeats the speed track's names; whether its gates
+  work on the Panorama is worth checking before porting.
+Plan: a `compact-stockcar` tool = rdtrack (decompile Stock Car from
+racedrivpan, remap objects by name, append models + catalogue records to the
+compact object ROM, relocate the name table, compile into slot 1, install the
+drones at 0x0C5980, rename "AUTOCROSS" -> "STOCK CAR" (both 9 chars)) followed
+by slapfree.py (slapstic + year-2000 fix).
