@@ -1838,3 +1838,52 @@ racedrivpan, remap objects by name, append models + catalogue records to the
 compact object ROM, relocate the name table, compile into slot 1, install the
 drones at 0x0C5980, rename "AUTOCROSS" -> "STOCK CAR" (both 9 chars)) followed
 by slapfree.py (slapstic + year-2000 fix).
+
+## Compact + Stock Car: built and running (2026-09-11)
+
+rdtrack/stockcar.py (docs_stockcar.md).  What it took beyond the feasibility
+notes above, in the order the bugs surfaced:
+
+* **Space.**  The compact's three worlds recompile to exactly the checksum
+  byte (0 bytes free; the 16 KB above it is zeros).  Stock Car needs ~28 KB
+  more than Autocross, so the DSK becomes 256 KB - two 27C010s on the same
+  DSK PCB (A047724-01), which is how the Panorama's is fitted.  The compile
+  layout limit and the checksum pad move to the end of the 256 KB image.
+* **Sum-signature pads must be bytes we own.**  A "\0\0 after a string"
+  heuristic picked live bytes at 0x3A9/0x10D6 and the board booted into SPUR
+  EXPTN ERROR.  Pads now: the R pair's zero tail (as slapfree), the immediates
+  of the disabled gates in the S pair, a victim's dead name string in the T
+  pair, the slack after slot 5's last keyframe in the X pair, a victim's dead
+  model in the object pairs.
+* **Route nodes name their slot.**  Flags bits 8-11 of every node are the
+  track index; 0x030038 reads the start node's nibble into the track variable
+  (0x901756 on the compact, 0x90173E on the cockpit).  The Panorama's Stock
+  Car nodes say 3, which made the compact index a fourth record and reset.
+  The nibble is rewritten to the slot on import.
+* **+0x84 is the track type the CHOOSE YOUR TRACK dial searches for**
+  (1C1C0C0C original, 1F1F0C0C autocross, F0F00C0C super stunt); the slot's
+  own value stays or the dial finds nothing.  The compact's dial is
+  position-based: about +400 from centre selects slot 1, +1200 slot 0, the
+  centre slot 2, the extremes ONE/TWO PLAYER.
+* **Drones hidden on slots 1 and 2.**  The green-light placement (cockpit
+  0x03759C: `cmpi.w #1,(A4)` / `#2,(A4)`, A4 = the track variable) hides
+  every drone on those slots because their only drone was a ghost; the
+  compact's copy at 0x037690.  With the #1 test disabled (immediate 7) the
+  four kind-1 stock cars line up beside the player exactly as the speed
+  track's drones do, drive off over the bridge and obey the rubber band.
+  Three other "track == 1" tests (0x02F048, 0x02F2A2, 0x0388B2 on the
+  compact: the autocross lap recording and gate handling) are disabled the
+  same way.  The bisect that found this reverted every per-track table
+  (the +C 132-byte table, +0xA0, block80, +0x94, +0x98, +0x9C word, champion,
+  awards, tuning words) with no effect - none of them is involved.
+* Object names are found (lookup at 0x021E66 reads the new strings at
+  0x0D8640) and nothing calls the error routine (0x02429E).
+* The Stock Car drone list is kind 1 x4 (slots 0-3) + kind 2 x3 (slot 5,
+  params 150/300/450), 6 slots + a 1549-keyframe ghost, copied verbatim to
+  0x0C5980-0x0D8640.
+
+Verified in MAME (custom clone racedrivcs, experiments/racedrivcs_mame.md):
+both variants boot clean, the original and super stunt slots are untouched,
+the dial reads STOCK CAR TRACK, the slot loads Stock Car's world, champion
+(1:37:74) and traffic; the stock-car models render on the grid and in the
+mirror.  Not driven yet by a person: gates and a full lap.
