@@ -42,6 +42,7 @@ end
 local brake, brake_axis = nil, nil
 for _, port in pairs(mach.ioport.ports) do
   if port.fields["Brake Pedal"] then brake = port.fields["Brake Pedal"] end
+  if port.fields["Force Brake"] then brake = port.fields["Force Brake"] end     -- the compact's name for it
 end
 if brake and os.getenv("BRAKE_HOLD") == "0" then
   brake:set_analog_reverse(false)     -- plain running mapping, no hold-until-live
@@ -63,7 +64,7 @@ end
 -- its maximum (255) - and the game reads that as full throttle, which is the
 -- stuck throttle. Un-reverse it and it rests at 0. GAS_REVERSE=1 puts it back
 -- if a real pedal is ever plugged into this machine.
-local PEDAL_KEY = { ["Gas Pedal"] = "KEYCODE_A", ["Brake Pedal"] = "KEYCODE_S" }
+local PEDAL_KEY = { ["Gas Pedal"] = "KEYCODE_A", ["Brake Pedal"] = "KEYCODE_S", ["Force Brake"] = "KEYCODE_S" }
 local GAS_REV = os.getenv("GAS_REVERSE") == "1"
 for _, port in pairs(mach.ioport.ports) do
   for nm, key in pairs(PEDAL_KEY) do
@@ -83,6 +84,16 @@ for _, port in pairs(mach.ioport.ports) do
   end
 end
 
+for _, port in pairs(mach.ioport.ports) do
+  for nm, key in pairs({ ["Key"] = "KEYCODE_K", ["Coin 1"] = "KEYCODE_5" }) do
+    local pf = port.fields[nm]
+    if pf and not pf.is_analog then
+      local ok, seq = pcall(function() return mach.input:seq_from_tokens(key) end)
+      if ok and seq then pcall(function() pf:set_input_seq("standard", seq) end); print("[rd] " .. nm .. " <- " .. key) end
+    end
+  end
+end
+
 -- ---------------------------------------------------------------------------
 -- Keyboard driving and clock top-up, for testing without a wheel.
 --   DRIVE=1  arrow keys steer, [ = 70%% throttle, ] = 100%%, down arrow brakes
@@ -94,6 +105,10 @@ end
 -- and 0 is full, 4095 is brake released and 0 is full. That matches the brake
 -- calibration (4095 = foot off), so the same convention holds for both.
 local DRIVE = os.getenv("DRIVE") == "1"
+local AUTOSEL = os.getenv("AUTOSEL") == "1"
+local AUTOSEL_DELTA = tonumber(os.getenv("AUTOSEL_DELTA") or "400")    -- +400 = slot 1, +1200 = slot 0, 0 = slot 2
+local AUTOSEL_CAR_DELTA = tonumber(os.getenv("AUTOSEL_CAR_DELTA") or "-400")   -- the car dial is an integrator: wheel offset x frames
+local AUTOSEL_CAR_FRAMES = tonumber(os.getenv("AUTOSEL_CAR_FRAMES") or "120")   -- -400 x 120 lands on SPORTSTER-AUTO TRANS
 local TIMEUP = os.getenv("TIME") == "1"
 
 local function findf(name)
@@ -439,4 +454,23 @@ _G.sub = emu.add_machine_frame_notifier(function()
     end
     pending = nil
   end
+
+  -- AUTOSEL=1: coin up, hold the CHOOSE YOUR TRACK dial on slot 1 (STOCK CAR on the
+  -- compact) and turn the key, then take the automatic-transmission car (the dial
+  -- at centre) and stop at the grid.  Runs after the steering code so it wins the
+  -- wheel for those frames only; the driver's keys are untouched.
+  if AUTOSEL then
+    local coin, key
+    for _, p in pairs(mach.ioport.ports) do
+      if p.fields["Coin 1"] then coin = p.fields["Coin 1"] end
+      if p.fields["Key"] then key = p.fields["Key"] end
+    end
+    local function hold(f, a, b) if f then if frames == a then f:set_value(1) elseif frames == b then f:set_value(0) end end end
+    hold(coin, 240, 285); hold(coin, 330, 375); hold(key, 480, 525); hold(key, 840, 885)
+    if whl and frames >= 300 and frames < 560 then whl:set_value(CENTRE + AUTOSEL_DELTA)
+    elseif whl and frames >= 560 and frames < 560 + AUTOSEL_CAR_FRAMES then whl:set_value(CENTRE + AUTOSEL_CAR_DELTA)   -- nudge the car dial (it integrates)
+    elseif whl and frames >= 560 and frames < 900 then whl:set_value(CENTRE); steer = CENTRE end
+    if frames == 900 then print("[rd] AUTOSEL: at the grid - turn the key (K) when ready") end
+  end
+
 end)
