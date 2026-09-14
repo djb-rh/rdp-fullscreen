@@ -1887,3 +1887,9 @@ both variants boot clean, the original and super stunt slots are untouched,
 the dial reads STOCK CAR TRACK, the slot loads Stock Car's world, champion
 (1:37:74) and traffic; the stock-car models render on the grid and in the
 mirror.  Not driven yet by a person: gates and a full lap.
+
+## Headless MAME without the black window (2026-09-14)
+
+`-video none` still lets SDL create a window on macOS, which grabs focus every
+run.  `SDL_VIDEODRIVER=dummy mame ... -video none -sound none -str N` runs the
+emulation and Lua scripts at full speed with no window at all.
