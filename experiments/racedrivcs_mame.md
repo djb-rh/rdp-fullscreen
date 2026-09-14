@@ -1,17 +1,116 @@
 MAME clone for testing a compact + Stock Car set (rdtrack.stockcar).
 
-Paste the ROM_START block after racedrivc's in src/mame/atari/harddriv.cpp, the
-GAME line after racedrivc's GAME line, add `racedrivcs` under `racedrivc` in
-src/mame/mame.lst, then (from the rdp-sidepod README):
+Paste the INPUT_PORTS block after racedrivc's, the ROM_START block after
+racedrivc's, the GAME line after racedrivc's GAME line, add `racedrivcs`
+under `racedrivc` in src/mame/mame.lst, then (from the rdp-sidepod README):
 
     make SUBTARGET=hd SOURCES=src/mame/atari/harddriv.cpp TOOLS=0 -j8
     ./hd racedrivcs -rompath /path/holding/a/racedrivcs/folder
 
 The clone declares the 256 KB DSK halves and the six object EPROMs; every
 other file is racedrivc's (their checksums will be reported wrong, which is
-only a warning).  Select the track by holding the wheel about +400 from centre
-during CHOOSE YOUR TRACK (the dial is position-based: +400 -> slot 1, +1200 ->
-slot 0, centre -> slot 2).
+only a warning).
+
+The input block is racedrivc's with the cockpit's names for the unused 8-bit
+channels.  (An earlier version put a "Brake Pedal" on 12-bit channel 1; that
+was wrong - the in-game sampler at 0x04DD0C only selects 12-bit channels, it
+never reads them.  The compact's brake is the 8-bit channel 6 "Force Brake",
+and the reason the car only crept in MAME was NVRAM: the brake RANGE word at
+zram 0xFF4400 is 0 in MAME's stock compact NVRAM, which the brake routine
+0x024D80 reads as full brake.  rd.lua writes the block once; NOTES.md
+"Compact brake calibration".)
+
+Selection dials are integrators: rd.lua AUTOSEL=1 coins up, picks slot 1 and
+the automatic car, and holds the shifter in Drive (N toggles neutral).
+
+static INPUT_PORTS_START( racedrivcs )
+	PORT_START("mainpcb:IN0")       /* 60c000 */
+	PORT_DIPNAME( 0x01, 0x01, "Diagnostic jumper" )
+	PORT_DIPSETTING(    0x01, DEF_STR( Off ) )
+	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_CUSTOM )    /* HBLANK */
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("mainpcb:screen", FUNC(screen_device::vblank))
+	PORT_BIT( 0x08, IP_ACTIVE_HIGH, IPT_CUSTOM )   /* 12-bit EOC */
+	PORT_BIT( 0x10, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("mainpcb:adc8", FUNC(adc0808_device::eoc_r))
+	PORT_SERVICE( 0x20, IP_ACTIVE_LOW )
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_COIN2 )
+	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_COIN1 )
+
+	PORT_START("mainpcb:SW1")       /* 60c002 */
+	PORT_DIPNAME( 0x01, 0x01, "SW1:8" )
+	PORT_DIPSETTING(    0x01, DEF_STR( Off ) )
+	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
+	PORT_DIPNAME( 0x02, 0x02, "SW1:7" )
+	PORT_DIPSETTING(    0x02, DEF_STR( Off ) )
+	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
+	PORT_DIPNAME( 0x04, 0x04, "SW1:6" )
+	PORT_DIPSETTING(    0x04, DEF_STR( Off ) )
+	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
+	PORT_DIPNAME( 0x08, 0x08, "SW1:5" )
+	PORT_DIPSETTING(    0x08, DEF_STR( Off ) )
+	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
+	PORT_DIPNAME( 0x10, 0x10, "SW1:4" )
+	PORT_DIPSETTING(    0x10, DEF_STR( Off ) )
+	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
+	PORT_DIPNAME( 0x20, 0x20, "SW1:3" )
+	PORT_DIPSETTING(    0x20, DEF_STR( Off ) )
+	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
+	PORT_DIPNAME( 0x40, 0x40, "SW1:2" )
+	PORT_DIPSETTING(    0x40, DEF_STR( Off ) )
+	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
+	PORT_DIPNAME( 0x80, 0x80, "SW1:1" )
+	PORT_DIPSETTING(    0x80, DEF_STR( Off ) )
+	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
+
+	PORT_START("mainpcb:a80000")
+	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_START2 ) PORT_NAME("Abort")
+	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_START1 ) PORT_NAME("Key")
+	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_COIN3 )    /* aux coin */
+	PORT_BIT( 0x00f8, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x0100, IP_ACTIVE_LOW, IPT_BUTTON2 )  PORT_NAME("1st Gear")
+	PORT_BIT( 0x0200, IP_ACTIVE_LOW, IPT_BUTTON3 )  PORT_NAME("2nd Gear")
+	PORT_BIT( 0x0400, IP_ACTIVE_LOW, IPT_BUTTON4 )  PORT_NAME("3rd Gear")
+	PORT_BIT( 0x0800, IP_ACTIVE_LOW, IPT_BUTTON5 )  PORT_NAME("4th Gear")
+	PORT_BIT( 0x3000, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x4000, IP_ACTIVE_LOW, IPT_CUSTOM )  /* center edge on steering wheel */
+	PORT_BIT( 0x8000, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("mainpcb:8BADC.0")        /* b00000 - 8 bit ADC 0 - gas pedal */
+	PORT_BIT( 0xff, 0x00, IPT_PEDAL ) PORT_SENSITIVITY(25) PORT_KEYDELTA(20) PORT_NAME("Gas Pedal")
+
+	PORT_START("mainpcb:8BADC.1")        /* b00000 - 8 bit ADC 1 - clutch pedal */
+	PORT_BIT( 0xff, 0x00, IPT_PEDAL3 ) PORT_SENSITIVITY(25) PORT_KEYDELTA(100) PORT_NAME("Clutch Pedal")
+
+	PORT_START("mainpcb:8BADC.2")        /* b00000 - 8 bit ADC 2 */
+	PORT_BIT( 0xff, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("mainpcb:8BADC.3")        /* b00000 - 8 bit ADC 3 */
+	PORT_BIT( 0xff, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("mainpcb:8BADC.4")        /* b00000 - 8 bit ADC 4 */
+	PORT_BIT( 0xff, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("mainpcb:8BADC.5")        /* b00000 - 8 bit ADC 5 */
+	PORT_BIT( 0xff, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("mainpcb:8BADC.6")        /* b00000 - 8 bit ADC 6 - force brake */
+	PORT_BIT( 0xff, 0x20, IPT_PEDAL2 ) PORT_MINMAX(0x20, 0xf0) PORT_SENSITIVITY(25) PORT_KEYDELTA(40) PORT_REVERSE PORT_NAME("Force Brake")
+
+	PORT_START("mainpcb:8BADC.7")        /* b00000 - 8 bit ADC 7 */
+	PORT_BIT( 0xff, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("mainpcb:12BADC.0")       /* 400000 - steering wheel */
+	PORT_BIT( 0xfff, 0x800, IPT_PADDLE ) PORT_MINMAX(0x010, 0xff0) PORT_SENSITIVITY(400) PORT_KEYDELTA(5) PORT_NAME("Steering Wheel")
+
+	/* dummy ADC ports to end up with the same number as the full version */
+	PORT_START("mainpcb:12BADC.1")
+	PORT_BIT( 0xfff, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_START("mainpcb:12BADC.2")
+	PORT_BIT( 0xfff, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_START("mainpcb:12BADC.3")
+	PORT_BIT( 0xfff, IP_ACTIVE_LOW, IPT_UNUSED )
+INPUT_PORTS_END
 
 ROM_START( racedrivcs )   // compact + the Panorama's Stock Car track (rdtrack.stockcar): 256 KB DSK, six object EPROMs
 	ROM_REGION( 0x100000, "mainpcb:maincpu", 0 )        /* 1MB for 68000 code */
@@ -65,4 +164,4 @@ ROM_START( racedrivcs )   // compact + the Panorama's Stock Car track (rdtrack.s
 	ROM_LOAD( "racedrivc.210e",  0x000000, 0x000800, CRC(2e843742) SHA1(bc73ab0270cdf45aaa1a19703e8c3aa916578ef0) )
 ROM_END
 
-GAME(  1990, racedrivcs,  racedriv, racedrivc_machine,  racedrivc, harddriv_new_state, empty_init, ROT0, "Atari Games", "Race Drivin' (compact, Stock Car track)", 0 )
+GAME(  1990, racedrivcs,  racedriv, racedrivc_machine,  racedrivcs, harddriv_new_state, empty_init, ROT0, "Atari Games", "Race Drivin' (compact, Stock Car track)", 0 )

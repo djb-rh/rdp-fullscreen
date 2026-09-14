@@ -54,6 +54,34 @@ elseif brake then
   print("[rd] brake held at 'no brake' until the pedal first reports (see NOTES.md)")
 end
 
+-- Compact brake calibration.  The compact's brake is a force sensor on 8-bit
+-- ADC channel 6 (RAM 0x900006: rest reads high, pressing pulls it down) and
+-- the program turns it into brake force with the RANGE word the operator sets
+-- in SET CONTROLS ("NOW STEP ON BRAKE FIRMLY AND RELEASE"): zram 0xFF4400 =
+-- range, 0xFF441E = the rest reading, 0xFF4428 = checksum (the words
+-- 0xFF4400..0xFF4428 sum to 0x3039).  MAME's stock NVRAM for the compact is a
+-- valid block with range 0 - never calibrated - and with range 0 the brake
+-- routine (0x024D80) returns FULL brake whenever the pedal reads at or below
+-- its baseline, so the car creeps at 4 mph against locked brakes whatever the
+-- throttle.  Write the block once, as SET CONTROLS would with MAME's Force
+-- Brake field (rest 0xF0, floor = the field's minimum, 0x20).  Zram writes need
+-- ZP1=0/ZP2=1 (nwr latches 0x604008/0x60401A), then ZP1=1/ZP2=0 to protect.
+local function calibrate_compact_brake()
+  if not (brake and brake.name == "Force Brake") then return end
+  local ok, range = pcall(function() return sp:read_u16(0xFF4400) end)
+  if not ok or range ~= 0 then return end
+  local rest = sp:read_u8(0x900006)
+  if rest < 0x40 then return end
+  sp:write_u16(0x604008, 0); sp:write_u16(0x60401A, 0)
+  sp:write_u16(0xFF4400, rest - brake.minvalue); sp:write_u16(0xFF441E, rest)
+  local sum = 0
+  for a = 0xFF4400, 0xFF4426, 2 do sum = sum + sp:read_u16(a) end
+  sp:write_u16(0xFF4428, (0x3039 - sum) & 0xFFFF)
+  sp:write_u16(0x604018, 0); sp:write_u16(0x60400A, 0)
+  print(string.format("[rd] compact brake was uncalibrated (range 0 = brake always on): wrote rest %d range %d to NVRAM",
+        rest, sp:read_u16(0xFF4400)))
+end
+
 -- Keyboard pedals: A = gas, S = brake, set here rather than in the cfg so they
 -- survive whatever is (or is not) saved there. MAME drives an analog pedal from
 -- a digital key through its "increment" sequence, and returns it to rest through
@@ -410,6 +438,7 @@ _G.sub = emu.add_machine_frame_notifier(function()
     end
   end
   frames = frames + 1
+  if frames == 150 then calibrate_compact_brake() end
   if svc.user_value ~= lastsvc then
     say(svc.user_value == 0 and "service mode ON" or "service mode OFF - back to the game")
     lastsvc = svc.user_value
@@ -470,7 +499,18 @@ _G.sub = emu.add_machine_frame_notifier(function()
     if whl and frames >= 300 and frames < 560 then whl:set_value(CENTRE + AUTOSEL_DELTA)
     elseif whl and frames >= 560 and frames < 560 + AUTOSEL_CAR_FRAMES then whl:set_value(CENTRE + AUTOSEL_CAR_DELTA)   -- nudge the car dial (it integrates)
     elseif whl and frames >= 560 and frames < 900 then whl:set_value(CENTRE); steer = CENTRE end
-    if frames == 900 then print("[rd] AUTOSEL: at the grid - turn the key (K) when ready") end
+    if frames == 900 then print("[rd] AUTOSEL: at the grid - turn the key (K) when ready; shifter held in DRIVE, N toggles neutral") end
+    -- the automatic still wants the shifter in a gear (any of the four D positions); an
+    -- unpressed shifter reads NEUTRAL and the car will not go.  Hold 1st from the grid on.
+    if frames >= 900 then
+      local g1
+      for _, p in pairs(mach.ioport.ports) do if p.fields["1st Gear"] then g1 = p.fields["1st Gear"] end end
+      local ok, kn = pcall(function() return mach.input:code_from_token("KEYCODE_N") end)
+      local down = ok and mach.input:code_pressed(kn)
+      if down and not _G.rd_n_was then _G.rd_neutral = not _G.rd_neutral; print("[rd] shifter: " .. (_G.rd_neutral and "NEUTRAL" or "DRIVE")) end
+      _G.rd_n_was = down
+      if g1 then g1:set_value(_G.rd_neutral and 0 or 1) end
+    end
   end
 
 end)

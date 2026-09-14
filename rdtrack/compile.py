@@ -72,7 +72,7 @@ def compile_doc(doc, fixed=False):
         n = len(R["nodes"]); ats = R.get("at", [None]*n)
         addrs = [L.place(dsk.NODE_SZ, ats[k]) for k in range(n)]
         for k, node in enumerate(R["nodes"]):
-            rec = dict(node); rec["next"] = addrs[(k+1) % n]
+            rec = dict(node); rec["next"] = addrs[node["next"] if isinstance(node.get("next"), int) else (k+1) % n]
             pv = node.get("prev", k - 1)
             rec["prev"] = addrs[k] if pv == "self" else (addrs[pv % n] if isinstance(pv, int) and pv < FRONT and pv < n else pv)
             buf[addrs[k]:addrs[k] + dsk.NODE_SZ] = dsk.enc_node(rec)

@@ -239,11 +239,22 @@ def build_set(blobs, out_dir, slapstic="free", verbose=print):
     doc["segments"]["S"] = {"bias": h["bias"], "start": h["start"], "header_raw": h["raw"].hex(), "segs": sc["segs"]["segs"]}
     ats = [n["at"] for n in sc["route"]]
     # route node flags bits 8-11 carry the slot the route belongs to: the program reads the start
-    # node's nibble as the track index (0x030038), so Stock Car's 3 (the Panorama's fourth slot)
-    # becomes the slot it now lives in
-    doc["routes"]["RS"] = {"nodes": [dict({k: v for k, v in n.items() if k not in ("at", "next", "prev")},
-                                          flags=(n["flags"] & ~0x0F00) | (SLOT << 8),
-                                          prev=(ats.index(n["prev"]) if n["prev"] in ats and n["prev"] != n["at"] else "self")) for n in sc["route"]]}
+    # node's nibble as the track index (0x030038), so Stock Car's 3 becomes the slot it lives in
+    nodes = [dict({k: v for k, v in n.items() if k not in ("at", "next", "prev")},
+                  flags=(n["flags"] & ~0x0F00) | (SLOT << 8),
+                  prev=(ats.index(n["prev"]) if n["prev"] in ats and n["prev"] != n["at"] else "self")) for n in sc["route"]]
+    # the start node's prev is not the mirror of a next: stock hangs a copy of the finish node
+    # there (value = the finish section) and the race start takes its section from it
+    # (0x02FD04: section = start.prev.value); without it the race resets as it begins
+    head = sc["route"][0]
+    if head["prev"] is not None and head["prev"] not in ats:
+        a = head["prev"]
+        nodes.append({"value": dsk.u16(pan, a), "value2": dsk.u16(pan, a + 2), "w4": dsk.u32(pan, a + 4),
+                      "flags": (dsk.u16(pan, a + 8) & ~0x0F00) | (SLOT << 8), "wE": dsk.u32(pan, a + 0xE), "w16": dsk.u32(pan, a + 0x16),
+                      "next": 0, "prev": "self"})
+        nodes[0]["prev"] = len(nodes) - 1
+        nodes[-2]["next"] = 0                                    # the chain still closes on the head
+    doc["routes"]["RS"] = {"nodes": nodes}
     doc["names"]["NS"] = {"entries": [{"name": e["name"], "v": e["v"]} for e in sc["names"]["entries"]]}
     front = bytearray(bytes.fromhex(doc["front"]))
     strpos = {"STRTPOST": 0x113C, "CHKPT": 0x1146, "": 0x1152}

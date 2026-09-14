@@ -30,4 +30,7 @@ CAR track" is longer, and the Stock Car gates and section names are the speed
 track's, as in the Panorama prototype.
 
 Testing in MAME needs a clone that loads 128 KB DSK halves and six object
-EPROMs: experiments/racedrivcs_mame.md.
+EPROMs: experiments/racedrivcs_mame.md.  Run it with rd.lua: MAME's stock
+compact NVRAM has the brake uncalibrated (range 0 = brake always on, the car
+only creeps), and rd.lua writes the calibration once.  On a real cabinet the
+operator's SET CONTROLS brake step does the same thing.

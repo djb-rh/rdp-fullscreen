@@ -1893,3 +1893,47 @@ mirror.  Not driven yet by a person: gates and a full lap.
 `-video none` still lets SDL create a window on macOS, which grabs focus every
 run.  `SDL_VIDEODRIVER=dummy mame ... -video none -sound none -str N` runs the
 emulation and Lua scripts at full speed with no window at all.
+
+## Compact brake calibration: why the car only crept in MAME (2026-09-14)
+
+Symptom: on the compact (our set and stock racedrivc alike) the car crawls at
+4 mph with any gas > 0, and nothing - gear, clutch, brake, DIPs, drones -
+changes it.  The throttle was never the problem: 0x900D32 reads 0x1000 (full)
+with the pedal down.  The physics input block starts at 0x900D28 (wheel x2),
+0x900D2A (BRAKE, not throttle), 0x900D2C (clutch), 0x900D32 (throttle),
+0x900D38 (key).  0x900D2A read 0x1000 = full brake for the whole race.
+
+The compact's brake is a force sensor on 8-bit ADC channel 6 (the in-game
+sampler 0x04DD0C stores 8-bit channel N at RAM 0x900000+N; it only *selects*
+12-bit channels and never reads them - the compact's wheel is the counter at
+0x400000).  The brake routine 0x024D80 turns the reading into force:
+
+    rest  = high word of 0x900F90 (a slow filter of channel 6, 0x029D5E)
+    range = zram word 0xFF4400, deadband = range >> 4 (min 1)
+    raw > rest              -> 0
+    raw <= rest - range     -> 0x1000 (full)
+    else (rest - raw - deadband) << 12 / (range - 2 x deadband), clipped
+
+Range comes from SET CONTROLS ("NOW STEP ON BRAKE FIRMLY AND RELEASE",
+0x0250B0: the largest drop below rest, min 0x15, written to 0xFF4400 with the
+rest reading at 0xFF441E).  The zram block 0xFF4400..0xFF4426 is checksummed
+at 0xFF4428 (words sum to 0x3039, 0x025BCC/0x025C10); the pedal min/max pairs
+for channels 0-7 live at 0xFF4402.. and the boot check reinitialises them
+from the live readings when the sum is wrong.  MAME's stock compact NVRAM
+(racedrivc.200e/210e) is a VALID block with range 0: never calibrated.  With
+range 0 the "raw <= rest - range" test is true at rest, so the brake reads
+full whenever the pedal is at or below its baseline.  Full throttle against
+full brake is the 4 mph creep.
+
+Fix: rd.lua writes the block once when it finds range 0 (rest 0xF0 from the
+Force Brake field, range = rest - the field's floor 0x20, checksum fixed),
+through the zram write-enable latches (ZP1=0 via 0x604008, ZP2=1 via
+0x60401A, then 0x604018/0x60400A to protect).  Measured: brake output 0,
+the car pulls to 18+ mph in 4 s.  A real cabinet has this calibrated by its
+operator; nothing in the ROMs is involved.  The earlier "12-bit brake" port
+in the racedrivcs clone was a wrong guess and is gone.
+
+Tools that got here: `-debug -debugger none` plus `wpset` from Lua works on
+the DSK RAM at 0x900000 (a handler) where Lua taps on 0xFF8xxx do not; the
+watch showed the physics reading the clutch byte 4x a frame and the gas byte
+twice in 10 frames, which is what pointed at the input block.
