@@ -512,8 +512,10 @@ _G.sub = emu.add_machine_frame_notifier(function()
     local STEPS = os.getenv("AUTOSEL_STEPS") or (AUTOSEL_DELTA == 1200 and "300:-127,301:-127,560:-32,680:-112" or "300:-112,560:-32,680:-112")
     if whl and frames >= 300 and frames < 900 then
       for f, d in string.gmatch(STEPS, "(%d+):(-?%d+)") do
-        if frames == tonumber(f) then _G.rd_sel = (_G.rd_sel or CENTRE) + tonumber(d); whl:set_value(_G.rd_sel) end
+        if frames == tonumber(f) then _G.rd_sel = (_G.rd_sel or CENTRE) + tonumber(d) end
       end
+      if frames == 898 then _G.rd_sel = CENTRE end   -- back to centre (whatever delta that makes)...
+      whl:set_value(_G.rd_sel or CENTRE)              -- held EVERY frame: the DRIVE code above writes the wheel too
       steer = CENTRE
     end
     -- The dial moves are 400-unit jumps, which the compact's byte-delta wheel
@@ -521,7 +523,6 @@ _G.sub = emu.add_machine_frame_notifier(function()
     -- the wheel a quarter turn left with the field at centre.  A real wheel
     -- passes its centre index at the grid and the game zeroes the count; do the
     -- same (9 is the count that reads as exactly 0 steering, 0x900D46).
-    if frames == 898 and whl then whl:set_value(CENTRE) end           -- field back to centre (whatever delta that makes)...
     if frames == 900 and COMPACT then sp:write_u16(0x900F98, 9); steer = CENTRE end   -- ...then the count is zeroed
     if frames == 900 then print("[rd] AUTOSEL: at the grid - turn the key (K) when ready; shifter held in DRIVE, N toggles neutral") end
     -- the automatic still wants the shifter in a gear (any of the four D positions); an
