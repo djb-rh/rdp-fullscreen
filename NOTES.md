@@ -1937,3 +1937,47 @@ Tools that got here: `-debug -debugger none` plus `wpset` from Lua works on
 the DSK RAM at 0x900000 (a handler) where Lua taps on 0xFF8xxx do not; the
 watch showed the physics reading the clutch byte 4x a frame and the gas byte
 twice in 10 frames, which is what pointed at the input block.
+
+## Compact steering in MAME: a counter, not a pot (2026-09-14)
+
+The compact's wheel is an incremental encoder.  MAME fakes it: hdc68k_wheel_r
+returns the 12-bit "Steering Wheel" field shifted up a byte, and the program
+(0x0298DE, every frame) takes the byte at 0x400000, subtracts last frame's,
+folds the difference into -127..127 and adds it to an accumulator at
+0x900F98, clamped to +-2 x 0x900F94 (0x900F94 = full-lock count, 1080 with
+MAME's NVRAM; 0x900F96 = -98 the index offset).  0x900D46 (steering to the
+physics) = about 1.2 x 0x900F98 - 11.  The centre index (bit 6 of 0xA80000,
+which MAME latches when the field crosses 0xF00) copies the count into
+0x900F9A; we never cross it.
+
+Consequences, all measured:
+* A field jump of more than 127 in one frame reads as the wrong sign.
+  AUTOSEL's dial moves (+400, -400, back) were three such jumps: -112, -32,
+  -112 = a count of -256 with the field back at centre, i.e. steering -313
+  (a quarter turn LEFT) from the grid on.  That was the "pulls left, feels
+  uncalibrated" - the calibration was fine.
+* The dials are position-based on that count: |count| ~110-250 = slot 1,
+  >= ~300 = slot 0, small = slot 2; a NEGATIVE count picks the normal race,
+  a positive one the BUDDY RACE (grid x 212600 instead of 209600).  The car
+  dial after the track key: -32 held, then -112, lands on SPORTSTER-AUTO.
+  Ramping the field smoothly to the same offsets does NOT reproduce this
+  (every ramped car move left the manual Sportster) - the dials evidently
+  key on single-frame deltas, so rd.lua now applies the deltas as a list
+  (AUTOSEL_STEPS, "frame:delta,...").  Slot 0 = -127,-127 on the track dial.
+* rd.lua puts the field at centre at frame 898 and writes the count to 9
+  (= exactly 0 steering) at frame 900, which is what the index pulse would do
+  with a real wheel at the grid.  DRIVE mode's span on the compact is the
+  full-lock count (1080), not half the 12-bit field (2048 - that was "the
+  steering is too fast"), and the field never moves more than 100 a frame.
+* The sign convention matches the cockpit: field up = 0x900D46 up on both,
+  so the arrow keys steer the same way.
+
+Autopilot (scratch auto.lua): follows drone slot 0's own lap (rdtrack.drones
+Path.positions from the compact main ROM at 0x0C5980 / 0x0A0000) with pure
+pursuit on the count wheel, SIGN=-1.  It laps the Stock Car world at 90+ mph
+until it cuts a corner too wide and takes the OFF ROAD reset around
+x 246-261k / z 135-151k; the four kind-1 stock cars run the same line ahead
+of it and slow to the rubber band when the player is stuck, which is what a
+stuck player sees as "the drones don't act right".  The brown wedge at the
+left of the view is the game's own windshield pillar (it is on the super
+stunt track too), not a rendering fault.

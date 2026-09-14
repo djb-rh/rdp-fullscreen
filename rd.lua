@@ -134,9 +134,7 @@ end
 -- calibration (4095 = foot off), so the same convention holds for both.
 local DRIVE = os.getenv("DRIVE") == "1"
 local AUTOSEL = os.getenv("AUTOSEL") == "1"
-local AUTOSEL_DELTA = tonumber(os.getenv("AUTOSEL_DELTA") or "400")    -- +400 = slot 1, +1200 = slot 0, 0 = slot 2
-local AUTOSEL_CAR_DELTA = tonumber(os.getenv("AUTOSEL_CAR_DELTA") or "-400")   -- the car dial is an integrator: wheel offset x frames
-local AUTOSEL_CAR_FRAMES = tonumber(os.getenv("AUTOSEL_CAR_FRAMES") or "120")   -- -400 x 120 lands on SPORTSTER-AUTO TRANS
+local AUTOSEL_DELTA = tonumber(os.getenv("AUTOSEL_DELTA") or "400")    -- 400 = slot 1 (STOCK CAR), 1200 = slot 0 (the original); see AUTOSEL_STEPS below
 local TIMEUP = os.getenv("TIME") == "1"
 
 local function findf(name)
@@ -145,6 +143,8 @@ local function findf(name)
   end
 end
 local whl = findf("Steering Wheel")
+local COMPACT = findf("Force Brake") ~= nil       -- the compact's brake; the cockpit calls its "Brake Pedal"
+local function s16(a) local ok, v = pcall(function() return sp:read_u16(a) end); if not ok then return 0 end; if v >= 0x8000 then v = v - 0x10000 end; return v end
 local KEY = {}
 if DRIVE or TIMEUP then
   for _, k in ipairs({"LEFT","RIGHT","BACKSPACE","COMMA","STOP"}) do
@@ -401,13 +401,20 @@ _G.sub = emu.add_machine_frame_notifier(function()
       -- Travel shrinks with speed.  A real wheel gives you 135 degrees to meter
       -- out a correction at 100 mph; an arrow key gives you none, so the key has
       -- to be given less of the lock to reach instead.
-      local span  = (whl.maxvalue - whl.minvalue) / 2
+      -- The compact's wheel is a COUNTER, not a pot: the game reads the byte at
+      -- 0x400000 every frame and adds the wrapped difference (0x0298DE, deltas
+      -- are folded into -127..127) to an accumulator, 0x900F98, whose full lock
+      -- is the calibrated count at 0x900F94 (1080 with MAME's NVRAM).  So on the
+      -- compact "full travel" is that count, not half the field's range, and no
+      -- frame may move the field by more than 127 or the delta changes sign.
+      local span  = COMPACT and (s16(0x900F94) > 0 and s16(0x900F94) or 1080) or (whl.maxvalue - whl.minvalue) / 2
       local limit = span * math.max(STEER_MIN, STEER_V0 / (mph + STEER_V0))
       local rate  = limit / (60 * STEER_FULL)
-      if     pressed("LEFT")  then steer = math.max(CENTRE - limit, steer - rate)
-      elseif pressed("RIGHT") then steer = math.min(CENTRE + limit, steer + rate)
-      else   steer = steer + (CENTRE - steer) * STEER_RETURN end
-      steer = math.max(whl.minvalue, math.min(whl.maxvalue, steer))
+      local want
+      if     pressed("LEFT")  then want = math.max(CENTRE - limit, steer - rate)
+      elseif pressed("RIGHT") then want = math.min(CENTRE + limit, steer + rate)
+      else   want = steer + (CENTRE - steer) * STEER_RETURN end
+      steer = math.max(whl.minvalue, math.min(whl.maxvalue, math.max(steer - 100, math.min(steer + 100, want))))
       whl:set_value(math.floor(steer))
     end
   end
@@ -496,9 +503,26 @@ _G.sub = emu.add_machine_frame_notifier(function()
     end
     local function hold(f, a, b) if f then if frames == a then f:set_value(1) elseif frames == b then f:set_value(0) end end end
     hold(coin, 240, 285); hold(coin, 330, 375); hold(key, 480, 525); hold(key, 840, 885)
-    if whl and frames >= 300 and frames < 560 then whl:set_value(CENTRE + AUTOSEL_DELTA)
-    elseif whl and frames >= 560 and frames < 560 + AUTOSEL_CAR_FRAMES then whl:set_value(CENTRE + AUTOSEL_CAR_DELTA)   -- nudge the car dial (it integrates)
-    elseif whl and frames >= 560 and frames < 900 then whl:set_value(CENTRE); steer = CENTRE end
+    -- The wheel is a counter on the compact: what the dials see is the DELTA the
+    -- byte at 0x400000 makes between frames, folded into -127..127 (0x0298DE).
+    -- AUTOSEL_STEPS lists the single-frame deltas to apply, "frame:delta,...".
+    -- Measured: -112 on the track dial = slot 1, normal race (positive deltas
+    -- pick the buddy race); -127,-127 = slot 0; nothing = slot 2.  The car dial
+    -- then wants -32 (held 120 frames) followed by -112: SPORTSTER-AUTO TRANS.
+    local STEPS = os.getenv("AUTOSEL_STEPS") or (AUTOSEL_DELTA == 1200 and "300:-127,301:-127,560:-32,680:-112" or "300:-112,560:-32,680:-112")
+    if whl and frames >= 300 and frames < 900 then
+      for f, d in string.gmatch(STEPS, "(%d+):(-?%d+)") do
+        if frames == tonumber(f) then _G.rd_sel = (_G.rd_sel or CENTRE) + tonumber(d); whl:set_value(_G.rd_sel) end
+      end
+      steer = CENTRE
+    end
+    -- The dial moves are 400-unit jumps, which the compact's byte-delta wheel
+    -- reads as -112 each (wrapped), so its accumulator 0x900F98 ends up -256 =
+    -- the wheel a quarter turn left with the field at centre.  A real wheel
+    -- passes its centre index at the grid and the game zeroes the count; do the
+    -- same (9 is the count that reads as exactly 0 steering, 0x900D46).
+    if frames == 898 and whl then whl:set_value(CENTRE) end           -- field back to centre (whatever delta that makes)...
+    if frames == 900 and COMPACT then sp:write_u16(0x900F98, 9); steer = CENTRE end   -- ...then the count is zeroed
     if frames == 900 then print("[rd] AUTOSEL: at the grid - turn the key (K) when ready; shifter held in DRIVE, N toggles neutral") end
     -- the automatic still wants the shifter in a gear (any of the four D positions); an
     -- unpressed shifter reads NEUTRAL and the car will not go.  Hold 1st from the grid on.
