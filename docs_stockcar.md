@@ -29,6 +29,10 @@ Known leftovers: the CHOOSE YOUR TRACK map picture still says AUTOCROSS TRACK
 CAR track" is longer, and the Stock Car gates and section names are the speed
 track's, as in the Panorama prototype.
 
+One deliberate side effect on every track: the roadside weed menu loses two of
+its seven plant kinds (FLOWER2 and FLOWER3 become WEED1 and FLOWER) because
+their object slots carry two of the stock-car models.
+
 Testing in MAME needs a clone that loads 128 KB DSK halves and six object
 EPROMs: experiments/racedrivcs_mame.md.  Run it with rd.lua: MAME's stock
 compact NVRAM has the brake uncalibrated (range 0 = brake always on, the car

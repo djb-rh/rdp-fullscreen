@@ -1981,3 +1981,41 @@ of it and slow to the rubber band when the player is stuck, which is what a
 stuck player sees as "the drones don't act right".  The brown wedge at the
 left of the view is the game's own windshield pillar (it is on the super
 stunt track too), not a rendering fault.
+
+## The weeds were stock cars: which object slots are really free (2026-09-14)
+
+The 22 slots the stock-car models take had been chosen as "no surviving track
+places them and nothing names them".  Wrong on two counts, found the hard way:
+
+* **The roadside weeds are not placements.**  0x0226BA scatters them itself
+  from an 8-byte menu at 0x4352A: WEED WEED1 WEED2 WEED FLOWER FLOWER1 FLOWER2
+  FLOWER3 (indices 24 66 67 24 2D 68 69 6A, picked by a random & 7), written
+  into the ADSP mover records (DM 0x0A00 + 25 words each; the 68k side is
+  0x8094C8, not the placement list at 0x809946).  Seven of the old victims
+  were exactly those, so every weed on the Stock Car track (and the original
+  ones) drew as a parked or wrecked stock car - the user's "drones sitting in
+  the grass" - and the polygon pool overflowed on the extra cars.
+* **The name scan.**  Objects are found by a linear scan of the name table
+  (0x022C1C) that stops at the first entry named "-1" (the compact has two,
+  156 and 157).  Giving the Panorama's nameless object the "-1" name and
+  putting it anywhere but the end truncated the table: "CANT FIND OBJ :
+  CHKPT".  It is now named PANOBJ.
+* **Objects looked up by name at boot or in menus cannot move:** FIREA-D,
+  FBALL, LITERED/YEL/GRN (boot hangs at DOWNLOADING GSP without them),
+  GRHORIZ (INIT HORIZON), SWHL (the car-select wheel: "CANT FIND OBJ : SWHL").
+  Every drone's W partner is its WRECK model and the race start checks for
+  it ("NO WRECK"), so all 22 Panorama objects are needed.
+* Live set for the record: the placement list never carries the drones;
+  the movers do.  The scan-the-render-list probe (scratch objscan.lua) sees
+  only static placements plus what the ADSP folds in.
+
+Final slots: BALE CONEB CONER CONEW CONEY (autocross-only placements), VANL
+C45R140 C3060 MHSTRT TREEBLIT BROCK CRSHSQ FLOAT65 FLOAT150 TESTOBJ WWAY
+EXPLO NEW150M (placed by nothing, named by nothing, never drawn in attract,
+grid, lap or crash scans, boot-safe), #115 (the second SWHL entry; the scan
+finds 114 first), #156 (the first "-1"), and FLOWER2/FLOWER3 freed by
+rewriting the weed menu's last two bytes to WEED1/FLOWER - five kinds of
+roadside plant instead of seven, on every track.  Boot-tested each candidate
+singly (bisect hook STOCKCAR_VICTIMS), then a Stock Car lap at 90 mph with
+the render list logged: the only reused slot that shows is 106, which now
+holds the Panorama's nameless object with its two legitimate placements.

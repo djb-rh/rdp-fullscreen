@@ -49,8 +49,22 @@ PATHS_AT, NPATH_SLOTS, SLOT_SZ = 0x0C5980, 8, 0x2598
 STRINGS_AT = PATHS_AT + NPATH_SLOTS * SLOT_SZ           # 0x0D8640: object-name strings for the new entries
 OBJTAB, OBJTAB_N, ENTRY = 0x4362A, 158, 28              # compact object-name table (found by the DOTLINE pointer)
 CAT = 18
-# objects no remaining track places, no list names, no code copies of their names, no partner of a used car
-VICTIMS = "BALE CONEB CONER CONEW CONEY VANL C45R140 C3060 MHSTRT WEED1 WEED2 FLOWER1 FLOWER2 FLOWER3 TREEBLIT BROCK WEED FLOWER CRSHSQ FLOAT65 FLOAT150 NEW150M".split()
+# Compact objects whose slots the stock cars can take.  Off limits: anything a surviving track
+# places, any drone-list or entity name, the player cars (FER/JAG/YEL and partners), and anything
+# the program looks up by NAME (the boot wants FIREA-D, FBALL, LITERED/YEL/GRN, GRHORIZ; the car
+# select wants SWHL; a lookup that fails is "CANT FIND OBJ" and a reset).  The roadside weeds are
+# scattered by the program from an 8-byte menu at WEED_MENU (0x0226BA), so WEED/WEED1/WEED2/
+# FLOWER/FLOWER1 stay; FLOWER2 and FLOWER3 are freed by pointing their two menu entries at WEED1
+# and FLOWER (five kinds of roadside plant instead of seven, on every track).  "#N" is a slot by
+# index: 115 the second of two SWHL entries (the name scan finds 114 first), 156 the first of two
+# "-1" terminators (the scan stops at the first "-1", so 157 keeps terminating it).
+VICTIMS = "BALE CONEB CONER CONEW CONEY VANL C45R140 C3060 MHSTRT TREEBLIT BROCK CRSHSQ FLOAT65 FLOAT150 TESTOBJ WWAY EXPLO NEW150M #115 #156 FLOWER2 FLOWER3".split()
+WEED_MENU = 0x4352A
+WEED_MENU_OLD = bytes.fromhex("246667242d68696a"); WEED_MENU_NEW = bytes.fromhex("246667242d68662d")
+# every Panorama stock car needs its STOP and W (wreck) partners: the race start checks ("NO WRECK")
+SKIP = []
+if os.environ.get("STOCKCAR_VICTIMS"):        # bisect hook
+    VICTIMS = os.environ["STOCKCAR_VICTIMS"].split()
 SUFFIX = lambda name: int(re.search(r"-(\d+)\.", name).group(1)[-2:], 16)   # 136078-5002.200r -> 0x02
 
 
@@ -163,7 +177,7 @@ def build_set(blobs, out_dir, slapstic="free", verbose=print):
     for d in sc["drones"]:
         for v in (d[1] + "STOP", "W" + d[1]):
             if v in pnames: needed.append(pnames.index(v))
-    needed = sorted(set(needed))
+    needed = sorted(set(needed) - {pnames.index(n) for n in SKIP if n in pnames})
     remap, new = {}, []
     for i in needed:
         nm = pnames[i]
@@ -173,10 +187,11 @@ def build_set(blobs, out_dir, slapstic="free", verbose=print):
             new.append(i)
     if len(new) > len(VICTIMS):
         raise SystemExit("need %d new objects but only %d replaceable entries" % (len(new), len(VICTIMS)))
-    victims = [cnames.index(v) for v in VICTIMS]
+    victims = [int(v[1:]) if v.startswith("#") else cnames.index(v) for v in VICTIMS]
     for i, v in zip(new, victims):
         remap[i] = v
     verbose("objects: %d carried by name, %d new over %s" % (len(needed) - len(new), len(new), [VICTIMS[k] for k in range(len(new))]))
+
 
     # object ROM: victims' catalogue records <- Panorama records; third pair <- Panorama's
     obj = bytearray(cobj) + bytearray(pobj[0x40000:0x60000])
@@ -196,10 +211,11 @@ def build_set(blobs, out_dir, slapstic="free", verbose=print):
     for i, v in zip(new, victims):
         ent = bytearray(pmain[ptab + i*ENTRY:ptab + (i + 1)*ENTRY])
         nm = pnames[i]
+        # the Panorama's nameless object must NOT keep its "-1" name: "-1" is the terminator of
+        # the program's name scan (0x022C1C stops at the first entry so named, "CANT FIND OBJ")
         if nm == "-1":
-            struct.pack_into(">I", ent, 0x14, struct.unpack_from(">I", cmain, OBJTAB + 156*ENTRY + 0x14)[0])
-        else:
-            s = nm.encode() + b"\0"; main[sp:sp + len(s)] = s; struct.pack_into(">I", ent, 0x14, sp); sp += len(s) + (len(s) & 1)
+            nm = "PANOBJ"
+        s = nm.encode() + b"\0"; main[sp:sp + len(s)] = s; struct.pack_into(">I", ent, 0x14, sp); sp += len(s) + (len(s) & 1)
         main[OBJTAB + v*ENTRY:OBJTAB + (v + 1)*ENTRY] = ent
     # the victims' old name strings are dead: a pad byte for the 200t/210t sum fix
     dead_name = struct.unpack_from(">I", cmain, OBJTAB + victims[0]*ENTRY + 0x14)[0]
@@ -208,6 +224,9 @@ def build_set(blobs, out_dir, slapstic="free", verbose=print):
         if main[m.start() - 3:m.start()] == b"an ":
             continue
         main[m.start():m.end()] = b"STOCK CAR"; n_ren += 1
+    if bytes(main[WEED_MENU:WEED_MENU + 8]) != WEED_MENU_OLD:
+        raise SystemExit("weed menu not where expected")
+    main[WEED_MENU:WEED_MENU + 8] = WEED_MENU_NEW
     # the program keeps three autocross-only rules behind "track index == 1" (the cone
     # course's lap recording and gate handling); Stock Car in that slot is a race like
     # the speed track, so those tests are made to look for a slot that does not exist
