@@ -5,7 +5,7 @@
 
 Writes world.json: units, every track's placements (object, 3x3 orientation in
 1.14 fixed point, position), every object model that decodes (vertices,
-faces as [colour, v0, v1, ...], catalogue radius/LOD/cull), the object names,
+faces as [attribute word, v0, v1, ...] (colour = attr & 0xFF, type = attr >> 12: F normal, 1 fill-to-bottom), catalogue radius/LOD/cull), the object names,
 and the palette banks from rd_palette.bin.  Nothing but your own dumps goes in.
 """
 import argparse, json, os, struct, sys
@@ -63,12 +63,13 @@ def main():
                 lo = None
         objects[str(i)] = {"name": names[i], "radius": c["radius"], "lod": c["lod"], "cull": c["cull"],
                            "verts": [list(v) for v in m["verts"]],
-                           "faces": [[colour] + idx for idx, colour in m["faces"]]}
+                           "faces": [[r["attr"]] + r["idx"] for r in m["records"]],
+                           "normals": [list(nv) for nv in m["normals"]]}
         if lo:
-            objects[str(i)]["far"] = {"verts": [list(v) for v in lo["verts"]], "faces": [[colour] + idx for idx, colour in lo["faces"]]}
+            objects[str(i)]["far"] = {"verts": [list(v) for v in lo["verts"]], "faces": [[r["attr"]] + r["idx"] for r in lo["records"]]}
     pal = open(a.palette, "rb").read() if os.path.exists(a.palette) else b""
     banks = [[[pal[(b*256+k)*3], pal[(b*256+k)*3+1], pal[(b*256+k)*3+2]] for k in range(256)] for b in range(len(pal)//768)]
-    bundle = {"format": "rdp-world-2", "units_per_foot": 40, "unit_mm": 7.62,
+    bundle = {"format": "rdp-world-4", "units_per_foot": 40, "unit_mm": 7.62,
               "tracks": tracks, "objects": objects, "palette": banks}
     os.makedirs(a.out, exist_ok=True)
     path = os.path.join(a.out, "world.json")
