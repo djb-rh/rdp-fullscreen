@@ -2165,3 +2165,71 @@ of the artwork blocks with the frame-buffer write that follows it):
   lap-end pose is 83%.  Left: sub-strip row splits the pod sometimes makes
   within a band (vertical scaling?), the exact pitch scale, and the stray
   far objects our renderer draws above the horizon that the pod culls.
+
+## The pod's projection, horizon and lighting, read from its GSP program (2026-09-15, evening)
+
+Three things the renderer had wrong, each now measured rather than fitted.  Six pod
+frames (2500..3500 step 200, rdp-sidepod/phase0 replays) are 96.7 / 95.6 / 95.1 /
+97.8 / 97.0 / 97.4 % pixel-identical to MAME's pod when our replay picks the same
+packet (it was 79 / 58 / 82 / 75 / 86 / 85 this morning).
+
+* **Vertical scale is 3/4.**  The ADSP projects into a 512 x 512 space (x' = 255 +
+  x*508/z, y' = 255 - y*508/z); the pod's 68010 rasterises that into a 384-row
+  drawing space and the screen shows rows 96..287.  So k = 508 horizontally,
+  ky = 381 vertically, and the projection centre is visible row 96.  A coordinate
+  descent over (k, ky, cy, eye forward/height offsets) against five pod frames lands
+  on 508 / 385 / 95.5 with no eye offset: the camera really is the packet position.
+
+* **The horizon is drawn by the GSP, and its code says exactly how** (MAME `-debug
+  -debugger none` + `dasm` from Lua; the GSP program lives in VRAM blocks 214-232,
+  command E001 -> FFF64860 -> FFF68390 (setup) / FFF69FE0 (draw) / FFF6CE80 +
+  FFF65B10 (slanted blit)).  Per draw frame the 68010 sends a 100-word block: the
+  camera matrix (rows right/up/forward, columns x/y/z, 1.14), a pitch word, two fill
+  colours (1C1C sky, 0C0C ground) and seven 32-bit VRAM pointers to strip
+  descriptors.  The GSP then:
+  - projects the two horizon directions 45 degrees either side of forward:
+    a = (fx + fz, fz - fx), b = (fx - fz, fz + fx); X = 8192*(a.right)/(a.forward),
+    Y = 8192*(a.up)/(a.forward) (integer, DIVS), and the same for b;
+  - if X_a - X_b < 400 or the camera is upside down or the two ends differ by more
+    than 256 rows, draws no horizon (fills sky or ground by forward.y);
+  - horizon rows: l50 = (Ya + Yb) >> 5, slope = ((Ya - Yb) << 8) / dx,
+    rowL = 192 - 0.75*(l50 - slope - 2), rowR = 192 - 0.75*(l50 + slope - 2),
+    centre = 192 - 0.75*l50 (drawing-space rows; the 0.75 is
+    `((v >> 1) + v) >> 1`).  That is the 3/4 again, with k = 512 here;
+  - panX = (0x380 * ((-atan2(fx, fz) as a 16-bit turn) & 0xFFFF)) >> 14, i.e.
+    3584 * (1 - heading/360) with heading = atan2(forward.x, forward.z);
+  - strip i of the seven sits at screen x = panX - 512*i; the two whose range
+    covers the screen are blitted (PIXBLT L,XY, source pitch 512) with their
+    BOTTOM on the horizon line, in |rowR - rowL| + 1 vertical slices that step one
+    row each so the strip follows the rolled horizon.  Strip heights 48 (mountains)
+    or 18 (trees).
+  The sheet (asset 68) is a linear stream of seven records, each a 12-pixel
+  descriptor {height, 512, ...} then height x 512 pixels - the descriptor pixels
+  are the "marker rows" and the 12 px per-band shifts seen before.  Panorama order
+  (strip i -> record) for Stock Car is 5,4,2,1,0,3,6 (from the pointer table the
+  68010 sends; where the 68010 gets it, and the order for tracks 0-2, still unread).
+  export_bundle.py emits `strips` (offset, height) in that order and RDPKit draws
+  them the pod's way (PodHorizon in FrameRenderer.swift); the fitted "segments"
+  model is kept only for old bundles.
+  NB the yaw/pitch tables at 68k ROM 0x47420/0x47430 must be patched to 0 for these
+  MAME taps (as podcam.lua does): with the stock NVRAM the pod's view matrix is
+  pitched to the floor and the horizon code bails out, drawing nothing.
+
+* **Lighting is per face, in camera space, from above and behind the viewer.**  A
+  placement/normal id map (rdpview --nmap) paired every pod pixel with our face
+  normal; 28 (normal, pod shade) samples across the six frames fit a light of
+  (0, 1, -1)/sqrt 2 in the camera frame with MR1 = 0x2D41 * N.L, AR = max(0, MR1 +
+  0x2D41), shade = (AR * 0x12 * 2 + 0x8000) >> 16 - mean error 0.07 shades; the
+  best world-fixed light is 0.46.  0x2D41 = 8192 * sqrt 2, so this is the ADSP's
+  8192 * N.L with an un-normalised (0, 0x4000, -0x4000) light.  The earlier
+  "per-object up-axis" model only looked right because most world faces face up.
+
+* **A clipping bug** dropped any face with a vertex behind the near plane whenever
+  the interpolated vertex landed at z = 99.999: the projection guard rejected it.
+  Pinning clipped vertices to z = near fixed the road slab under the car vanishing
+  on some packets (frame 2500: 80 -> 95 %).
+
+Left: the (8,6) road-piece seam order and ground-vs-road edges at some frames
+(frame 2900 is 88.7 % with the wrong packet, 95.1 % with the right one), the far
+object culling rule, the horizon order for tracks 0-2, and the pod's draw cadence
+(its picture is 14-19 frames behind the link packet in these captures).
