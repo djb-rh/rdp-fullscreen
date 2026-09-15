@@ -109,7 +109,8 @@ def main():
                 off = (ptr - POD_HZ_VRAM_BASE) // 8
                 if not (0 <= off < len(pix)): strips = []; break
                 strips.append({"offset": off + 12, "height": pix[off]})
-            horizons[t] = {"width": 512, "rows": len(pix)//512, "data": base64.b64encode(bytes(pix)).decode(), "segments": HORIZON_SEGMENTS, "px_per_degree": 512/(360/7), "pitch_rows": 340, "strips": strips}
+            fills = struct.unpack_from(">H", pod, POD_HZ_PTRS + int(t)*POD_TRACK_STRIDE + 0x20)[0]   # sky and ground fill colours, byte-doubled (1C1C 0C0C)
+            horizons[t] = {"sky": fills >> 8, "ground": struct.unpack_from(">H", pod, POD_HZ_PTRS + int(t)*POD_TRACK_STRIDE + 0x22)[0] >> 8, "width": 512, "rows": len(pix)//512, "data": base64.b64encode(bytes(pix)).decode(), "segments": HORIZON_SEGMENTS, "px_per_degree": 512/(360/7), "pitch_rows": 340, "strips": strips}
     pal = open(a.palette, "rb").read() if os.path.exists(a.palette) else b""
     banks = [[[pal[(b*256+k)*3], pal[(b*256+k)*3+1], pal[(b*256+k)*3+2]] for k in range(256)] for b in range(len(pal)//768)]
     for t in tracks:
