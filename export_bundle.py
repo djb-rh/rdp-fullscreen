@@ -10,8 +10,27 @@ and the palette banks from rd_palette.bin.  Nothing but your own dumps goes in.
 """
 import argparse, json, os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import mesh
+import base64
+import mesh, codec
 from rdtrack import dsk, stockcar
+
+POD_MAIN = [("088-%d.bin" % (2002 + 2*k), "088-%d.bin" % (2001 + 2*k)) for k in range(8)]   # the side pod's 68010 program
+POD_TRACK_TABLE, POD_TRACK_STRIDE = 0xA0080, 0xA4     # per-track records in the pod ROM; the palette pointer sits at +0
+POD_ASSET_TABLE = 0x060000                              # the pod's 70 packed bitmaps
+HORIZON_ASSET = {3: 68, 0: 68, 1: 68, 2: 68}            # sheet per track (68 confirmed for Stock Car; others unverified)
+# the horizon sheet as the pod draws it (measured on the MAME pod, 2026-09-15): seven 512-px strips of the
+# sheet, each CYCLIC (it wraps) and scrolled at ~9.96 px per degree of heading from its own origin; each is
+# drawn only while the heading is inside its sector, at its own view row (car level; pitch moves them).
+# The four mountain strips cover about 150..15 degrees through north, the three tree strips the rest.
+HORIZON_SEGMENTS = [{"rows": [144, 191], "row": 47, "origin": 316.8, "sector": [295, 15]},
+                    {"rows": [96, 143],  "row": 47, "origin": 160.7, "sector": [147, 235]},
+                    {"rows": [48, 95],   "row": 52, "origin": 212.0, "sector": [192, 292]},
+                    {"rows": [0, 47],    "row": 47, "origin": 261.8, "sector": [262, 348]},
+                    {"rows": [228, 245], "row": 77, "origin": 12.6,  "sector": [355, 75]},
+                    {"rows": [210, 227], "row": 77, "origin": 62.8,  "sector": [45, 125]},
+                    {"rows": [192, 209], "row": 77, "origin": 114.2, "sector": [98, 185]}]
+
+
 
 CAT = 18
 
@@ -67,9 +86,23 @@ def main():
                            "normals": [list(nv) for nv in m["normals"]]}
         if lo:
             objects[str(i)]["far"] = {"verts": [list(v) for v in lo["verts"]], "faces": [[r["attr"]] + r["idx"] for r in lo["records"]]}
+    # the pod's own per-track palette (bank 0) and horizon sheet, straight from the pod program ROM
+    pod = bytes(stockcar.pairs(blobs, POD_MAIN))
+    palettes, horizons = {}, {}
+    for t in tracks:
+        ptr = struct.unpack_from(">I", pod, POD_TRACK_TABLE + int(t)*POD_TRACK_STRIDE)[0]
+        palettes[t] = [[pod[ptr + k*3], pod[ptr + k*3 + 1], pod[ptr + k*3 + 2]] for k in range(256)]
+        entry = HORIZON_ASSET.get(int(t))
+        if entry is not None:
+            ap = struct.unpack_from(">I", pod, POD_ASSET_TABLE + entry*4)[0]
+            pix, _end = codec.unpack(pod, ap, limit=512*246)
+            horizons[t] = {"width": 512, "rows": len(pix)//512, "data": base64.b64encode(bytes(pix)).decode(), "segments": HORIZON_SEGMENTS, "px_per_degree": 512/(360/7), "pitch_rows": 340}
     pal = open(a.palette, "rb").read() if os.path.exists(a.palette) else b""
     banks = [[[pal[(b*256+k)*3], pal[(b*256+k)*3+1], pal[(b*256+k)*3+2]] for k in range(256)] for b in range(len(pal)//768)]
-    bundle = {"format": "rdp-world-4", "units_per_foot": 40, "unit_mm": 7.62,
+    for t in tracks:
+        tracks[t]["palette"] = palettes[t]
+        if t in horizons: tracks[t]["horizon"] = horizons[t]
+    bundle = {"format": "rdp-world-5", "units_per_foot": 40, "unit_mm": 7.62,
               "tracks": tracks, "objects": objects, "palette": banks}
     os.makedirs(a.out, exist_ok=True)
     path = os.path.join(a.out, "world.json")
