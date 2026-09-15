@@ -2075,3 +2075,37 @@ MAME's Panorama the cabinet.  Verified: MAME -> pty -> podlink -> rdpview,
 1218 packets in 50 s; a replayed Stock Car lap renders the right scenery
 from the link pose.  The pty option needs the 38400 8N1 input defaults on
 the centre board's slot too (second hunk of the patch) or it is garbage.
+
+## Faithful renderer: colour rule, backdrop, palette (2026-09-15)
+
+Measured against the MAME pod (racedrivpans) frame by frame, using an id-map
+render (each face filled with its attribute) over the pod's pixels:
+
+* **Colour rule (ADSP 0x021E).**  Face colour c = attr & 0xFF.  c >= 31: flat,
+  pixel index = c & 0x1F.  c < 31: lit, index = (c << 4) + 16 | shade, where
+  MR1 = (N.L in 1.14 x 1.14, SS) >> 16 = 8192 N.L, AR = max(0, MR1 + 0x2D41),
+  shade = (AR * 0x12 * 2) >> 16 (1..10 for N.L in -1..1).  The light is
+  PM 0x1019..1B = (0, 0x4000, 0): straight up.  N is the face normal rotated
+  by the object's matrix (DM 0x14..16 held the current one).  Fog (0x242)
+  is off (DM 0x1FE6 = 0).  So the ramps at 32.. are colours 1..14 x 16
+  shades; entries 0-31 are flat colours.
+* **Backdrop.**  Sky = entry 28, ground = entry 12, split at the horizon.
+* **Palette is per track, not per boot.**  rd_palette.bin (dumped at boot)
+  differs from the palette during the Stock Car race in 59 of bank 0's
+  entries (sky 28 is orange at boot).  rd_palette_stockcar.bin = the pod's
+  palette RAM mid-lap; export_bundle.py --palette takes it.  Bank 0 is the
+  one in use (sky/horizon entries exist only there).  Still to do: read the
+  per-track palettes out of the ROM instead of a live dump.
+* **Result.**  rdpview faithful mode at 512x192, lap-end pose: 85% of pixels
+  identical to the pod, mean abs diff 12.7/255.  Mid-lap moving frames score
+  46-85%: partly timing (the pod applies a packet about a frame after its
+  last byte; the replay clock and the snapshot timer are not locked to it)
+  and partly the missing horizon.
+* **Horizon bands.**  The pod's treeline at rows ~85-97 matches sheet 68
+  (also sheet 7 - same panorama), and it is a PARALLAX stack: several bands
+  of the sheet appear at once at different row offsets, and their x offsets
+  move at different rates with heading (band 4 vs band 3 differ by a constant
+  12 px; offsets vs heading are not one linear rate).  The 68010 draws them
+  through the GSP; the drawing code, not the pixels, is what to read next.
+  Matches so far (heading -> band 3 x offset): -97.9 -> 170, -147.7 -> 310,
+  -159.2 -> 473, -175.5 -> 109, 180.0 -> 164.
