@@ -2233,3 +2233,16 @@ Left: the (8,6) road-piece seam order and ground-vs-road edges at some frames
 (frame 2900 is 88.7 % with the wrong packet, 95.1 % with the right one), the far
 object culling rule, the horizon order for tracks 0-2, and the pod's draw cadence
 (its picture is 14-19 frames behind the link packet in these captures).
+
+**Horizon sheets per track (2026-09-15, later).**  The per-track record in the pod ROM
+actually starts 0x1C before the palette pointer, at 0xA0064 + track*0xA4: seven 32-bit
+VRAM pointers to the strip descriptors (in panorama order), then the palette pointer,
+then the sky/ground fill colours (1C1C 0C0C for tracks 0 and 3, 1F1F for 1, F0F0 for
+2) and more.  The sheet is always unpacked at VRAM bit address 0xFFE43500 (row 579,
+column 160), so pointer - base gives each record's offset in the unpacked stream.
+Which asset is unpacked was checked by feeding the pod synthetic captures whose
+type-01 roster names each track and dumping VRAM rows 576-840 (phase0/podvram2.lua):
+track 0 -> asset 7, 1 -> 8, 2 -> 13, 3 -> 68 (byte-identical).  Tracks 1 and 2 have
+42/48/42/48/18/18/42-row strips.  The 68010 rewrites the descriptor words in VRAM
+after unpacking (the assets' own descriptor bytes vary), so export_bundle.py takes
+only the height byte from the sheet and the order from the pointers.

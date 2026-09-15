@@ -17,13 +17,14 @@ from rdtrack import dsk, stockcar
 POD_MAIN = [("088-%d.bin" % (2002 + 2*k), "088-%d.bin" % (2001 + 2*k)) for k in range(8)]   # the side pod's 68010 program
 POD_TRACK_TABLE, POD_TRACK_STRIDE = 0xA0080, 0xA4     # per-track records in the pod ROM; the palette pointer sits at +0
 POD_ASSET_TABLE = 0x060000                              # the pod's 70 packed bitmaps
-HORIZON_ASSET = {3: 68, 0: 68, 1: 68, 2: 68}            # sheet per track (68 confirmed for Stock Car; others unverified)
+HORIZON_ASSET = {0: 7, 1: 8, 2: 13, 3: 68}              # horizon sheet per track (each verified against the pod's VRAM in MAME, 2026-09-15)
+POD_HZ_PTRS = 0xA0064                                   # per-track record (stride 0xA4): seven VRAM pointers to the strip descriptors, then the palette pointer at +0x1C
+POD_HZ_VRAM_BASE = 0xFFE43500                           # where the pod unpacks the sheet: the first descriptor's VRAM bit address
 # the horizon sheet as the pod draws it (measured on the MAME pod, 2026-09-15): seven 512-px strips of the
 # sheet, each CYCLIC (it wraps) and scrolled at ~9.96 px per degree of heading from its own origin; each is
 # drawn only while the heading is inside its sector, at its own view row (car level; pitch moves them).
 # The four mountain strips cover about 150..15 degrees through north, the three tree strips the rest.
 # Each mountain band's first sheet row carries a 12-px-per-band index marker at its left; the pod never shows it.
-HORIZON_ORDER = [5, 4, 2, 1, 0, 3, 6]   # panorama strip i -> sheet record (from the pod's descriptor table, Stock Car)
 HORIZON_SEGMENTS = [{"rows": [145, 191], "row": 48, "origin": 316.8, "sector": [295, 15]},
                     {"rows": [97, 143],  "row": 48, "origin": 160.7, "sector": [147, 235]},
                     {"rows": [49, 95],   "row": 53, "origin": 212.0, "sector": [192, 292]},
@@ -97,16 +98,17 @@ def main():
         entry = HORIZON_ASSET.get(int(t))
         if entry is not None:
             ap = struct.unpack_from(">I", pod, POD_ASSET_TABLE + entry*4)[0]
-            pix, _end = codec.unpack(pod, ap, limit=512*248)
-            # The sheet is a linear stream of seven records: a 12-pixel (6-word) descriptor {height, 512, ...} then
-            # height x 512 pixels.  The pod's GSP draws them as a 3584-px panorama in the order of the descriptor
-            # pointer table its 68010 sends (HORIZON_ORDER, record indices); see NOTES.md "How the pod really draws the horizon".
-            recs, off = [], 0
-            while off + 12 <= len(pix) and len(recs) < 7:
-                h = pix[off]; w = pix[off+2] | (pix[off+3] << 8)
-                if h == 0 or w != 512: break
-                recs.append({"offset": off + 12, "height": h}); off += 12 + h*512
-            strips = [recs[k] for k in HORIZON_ORDER] if len(recs) == 7 else []
+            pix, _end = codec.unpack(pod, ap, limit=512*260)
+            # The sheet is a linear stream of seven records: a 12-pixel (6-word) descriptor then height x 512 pixels.
+            # The pod's GSP draws them as a 3584-px panorama; strip i's descriptor is the i-th VRAM pointer of the
+            # track's record in the pod ROM (the 68010 rewrites the descriptor words after unpacking, so only the
+            # height byte is taken from the sheet).  See NOTES.md "How the pod really draws the horizon".
+            strips = []
+            for i in range(7):
+                ptr = struct.unpack_from(">I", pod, POD_HZ_PTRS + int(t)*POD_TRACK_STRIDE + 4*i)[0]
+                off = (ptr - POD_HZ_VRAM_BASE) // 8
+                if not (0 <= off < len(pix)): strips = []; break
+                strips.append({"offset": off + 12, "height": pix[off]})
             horizons[t] = {"width": 512, "rows": len(pix)//512, "data": base64.b64encode(bytes(pix)).decode(), "segments": HORIZON_SEGMENTS, "px_per_degree": 512/(360/7), "pitch_rows": 340, "strips": strips}
     pal = open(a.palette, "rb").read() if os.path.exists(a.palette) else b""
     banks = [[[pal[(b*256+k)*3], pal[(b*256+k)*3+1], pal[(b*256+k)*3+2]] for k in range(256)] for b in range(len(pal)//768)]
