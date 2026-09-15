@@ -2137,3 +2137,31 @@ of the artwork blocks with the frame-buffer write that follows it):
   parameters (host port traffic is ~150 words on a draw frame).
 * The GSP reads nothing else from the artwork region during a frame, so the
   horizon and the two flat fills are the entire backdrop.
+
+## Horizon and palette, from the ROM (2026-09-15, later)
+
+* **Per-track palette in the pod ROM.**  The pod's 68010 ROM (088-2001..2016
+  interleaved, even file = high byte) keeps 768-byte RGB tables; a per-track
+  record table at 0xA0080 with stride 0xA4 holds the pointer at +0 (track 3
+  -> 0xA2204, byte-identical to the palette RAM dumped mid-lap; tracks 0-2 ->
+  0xA1904/0xA1C04/0xA1F04).  export_bundle.py now reads it, so the bundle
+  needs no live dump.  The other 0xA4-byte record fields are unread; one of
+  them presumably names the horizon sheet.
+* **Horizon strips, empirically.**  60 draw frames along the lap
+  (rdp-sidepod/phase0/podcopy.lua, FRAMES every 60): the sheet (entry 68,
+  246 rows) is used as seven 512-px strips - mountains rows 0-47, 48-95,
+  96-143, 144-191 and trees 192-209, 210-227, 228-245.  Every strip scrolls
+  at the same ~9.96 px per degree of heading (512 px = 360/7 degrees), wraps
+  (it is cyclic), and is drawn only while the heading is inside its sector:
+  band3 295..15 (through north), treeC 355..75, treeB 45..125, treeA
+  98..185, band2 147..235, band1 192..292, band0 262..348; origins (heading
+  where the strip's left edge is at x=0): 316.8, 12.6, 62.8, 114.2, 160.7,
+  212.0, 261.8.  Mountain strips sit with their top at view row 47 (band1
+  52), tree strips at 77 (frame-buffer rows 51/56/81 minus a 4-row display
+  offset found by alignment); pitch lifts them about 340 rows per unit of
+  the forward vector's y.  The 12-px steps between strips seen earlier were
+  the origins, not a per-band rule.  With this the horizon rows match the
+  pod 50-60% pixel-for-pixel (they were 0); whole-frame identity at the
+  lap-end pose is 83%.  Left: sub-strip row splits the pod sometimes makes
+  within a band (vertical scaling?), the exact pitch scale, and the stray
+  far objects our renderer draws above the horizon that the pod culls.
