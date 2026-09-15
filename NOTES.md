@@ -2048,3 +2048,17 @@ The 2026-08 note "type 02 = 34 bytes" was only the common case.
   the compact).  The draw list's camera is instance object 0x29.
 * The real-cabinet capture (rdp-sidepod/capture/hardware_link.bin) frames
   100% with the new decoder: 440 packets, roster "01 00 01 55".
+
+## The pod's camera math (2026-09-15)
+
+Measured on the standalone pod (racedrivpans) replaying the Stock Car lap with
+the yaw/pitch tables patched to 0, 53, -53 and pitch 21 (rdp-sidepod/phase0/
+podcam.lua).  Viewpoint block in ADSP data (68k 0x80BFCE..): u16 20000, then
+s32 x/y/z at 0x80BFD2/D6/DA = the link position exactly (no seat offset), then
+the 9 x s16 matrix at 0x80BFEA = the link matrix with the car's axes (columns:
+c0 right, c1 up, c2 forward) rotated in the car frame - yaw about c1 (+53
+turns the view toward c0 = right), then pitch about c0 (+ looks up).  The pod
+holds between packets: camera and cars step once per pose packet, about a
+frame after its last byte.  So "faithful" = step at 12 Hz; our renderer can
+interpolate and will look smoother than the original.  rdplink.pod_view()
+implements the transform.
