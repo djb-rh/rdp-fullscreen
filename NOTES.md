@@ -2062,3 +2062,16 @@ holds between packets: camera and cars step once per pose packet, about a
 frame after its last byte.  So "faithful" = step at 12 Hz; our renderer can
 interpolate and will look smoother than the original.  rdplink.pod_view()
 implements the transform.
+
+## Open renderer, phase 1 started (2026-09-15)
+
+~/Developer/rdp-renderer (MIT, SwiftPM): RDPKit (link framer/decoder, state
+with velocity prediction, bundle loader, pod camera transform, projection)
+and rdpview, a Mac wireframe viewer fed by a capture replay or UDP.
+export_bundle.py here writes world.json (all four Panorama tracks, 185
+models, palette banks).  podlink.py --udp sends one datagram per packet;
+the MAME mirror (rdp-sidepod/link_mirror.patch, `-mainpcb:rs232 pty`) makes
+MAME's Panorama the cabinet.  Verified: MAME -> pty -> podlink -> rdpview,
+1218 packets in 50 s; a replayed Stock Car lap renders the right scenery
+from the link pose.  The pty option needs the 38400 8N1 input defaults on
+the centre board's slot too (second hunk of the patch) or it is garbage.
