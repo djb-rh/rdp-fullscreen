@@ -2109,3 +2109,31 @@ render (each face filled with its attribute) over the pod's pixels:
   through the GSP; the drawing code, not the pixels, is what to read next.
   Matches so far (heading -> band 3 x offset): -97.9 -> 170, -147.7 -> 310,
   -159.2 -> 473, -175.5 -> 109, 180.0 -> 164.
+
+## Horizon: how the pod draws it (2026-09-15, partial)
+
+Instrumented the pod's GSP (rdp-sidepod/phase0/podcopy.lua pairs each read
+of the artwork blocks with the frame-buffer write that follows it):
+
+* The pod renders only on frames when a packet has arrived (every 4 frames
+  during the lap); a render clears the 192-row view (12288 words) and copies
+  horizon strips from the unpacked sheet, which sits in VRAM at rows 580-826
+  (246 rows; podvram.lua dumps rows 480-1023 to an image).
+* The copies are 48-row strips of the sheet (art rows 580-627, 628-675,
+  676-723, 724-771, 772-819...), one or two per frame, to view rows about
+  51-60 .. 99-107 (the top row varies a little frame to frame, presumably
+  with the car's pitch).  Each successive strip is drawn 12 px further left
+  than the previous one (band k shift = base - 12k), and a short strip of art
+  rows 771-789 is often drawn over the main one at base - 24.
+* Base shift vs heading (deg, 0..360) from six draw frames: 148.7 -> -102,
+  169.1 -> 88, 184.5 -> -252, 200.8 -> -96, 212.3 -> 42, 262.1 -> -4 (mod 512).
+  About 9-12 px per degree between neighbours, i.e. a strip is roughly the
+  view's 53 degrees wide; which strip is primary steps from 2 (149-185) to
+  1-2 (201) to 0-1 (262), so strips are angular segments in the mirrored
+  sense (index falls as heading rises) - but the two-strip cases (2 with the
+  771-789 tail, not 2 with 3) do not fit plain segments.  Seven samples are
+  not enough; the GSP program (blocks 214-232) does the copy and its source
+  address arithmetic is the thing to read next.  The 68010 writes only the
+  parameters (host port traffic is ~150 words on a draw frame).
+* The GSP reads nothing else from the artwork region during a frame, so the
+  horizon and the two flat fills are the entire backdrop.
