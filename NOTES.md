@@ -2019,3 +2019,32 @@ roadside plant instead of seven, on every track.  Boot-tested each candidate
 singly (bisect hook STOCKCAR_VICTIMS), then a Stock Car lap at 90 mph with
 the render list logged: the only reused slot that shows is 106, which now
 holds the Panorama's nameless object with its two legitimate placements.
+
+## Panorama link, decoded (2026-09-15) - phase 0 of the open renderer
+
+Logged the centre board's DUART transmit register in MAME racedrivpan beside
+its ADSP draw list (rdp-sidepod/phase0/, decoder rdp-sidepod/rdplink.py).
+The 2026-08 note "type 02 = 34 bytes" was only the common case.
+
+* Type 02 body = 33 bytes + 11 per car: camera x/y/z (s32), 3x3 orientation
+  (9 x s16, 1.14; the car's forward axis is (m2, m8)), s16 steer (tracks yaw
+  rate), u8 car count.  Car record: roster slot, then 56 bits = x s20 | y/4
+  u16 | z s20, then pitch, roll, heading as 256ths of a turn (forward =
+  (sin, cos) in x,z).  Absent slot = x 0x7FFFD.  The race-start packet (110
+  bytes) lists all seven slots.
+* Type 01 (10 bytes) at race start = track, 0, count, and the object id of each
+  slot's model (Stock Car: B5 A3 AF AC B2 A9 A6 = four racers, three parked).
+  Type 06 = the track dial (s16) while choosing; type 04 = car confirmed.
+* The cars sent are the ones in the pods' side sectors, ~30-110 degrees off the
+  forward axis either side, at any distance (seen at 20k units); straight ahead
+  and behind are not sent.  So the drones the user sees the pods obeying the
+  rubber band are real link data - and a forward-view renderer fed only by the
+  link has no traffic ahead.  It would need the drone logic (paths + rubber
+  band against the player pose) or a second source.
+* Rates: 12 type-02/s while racing (one per ~5 frames), 7/s in attract.
+* Selecting on the Panorama in MAME: the wheel is the compact's byte counter;
+  linkrace.lua's WSTEPS "300:-112,700:-32,760:-112" = Stock Car, single
+  player, automatic.  +deltas land in BUDDY RACE (positive side = buddy, as on
+  the compact).  The draw list's camera is instance object 0x29.
+* The real-cabinet capture (rdp-sidepod/capture/hardware_link.bin) frames
+  100% with the new decoder: 440 packets, roster "01 00 01 55".
