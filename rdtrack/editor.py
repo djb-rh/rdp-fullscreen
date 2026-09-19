@@ -216,11 +216,23 @@ def layout(design):
         out["closure"] = {"dx": round(start[0] - open_end[0]), "dz": round(start[1] - open_end[1]),
                           "dth": round(((start[2] - open_end[2] + 180) % 360) - 180, 2)}
     # scenery, resolved the way the compiler resolves it
+    objs = {}
+    try:
+        objs = json.load(open(os.path.join(HERE, "objects.json")))
+    except Exception:
+        pass
     try:
         track = scenery.Track(pl, geoms, bool(design.get("close")))
         for i, s in enumerate(design.get("scenery", [])):
+            if "kit" in s:
+                # composites resolve inside scenery.expand; show them at their anchor
+                x, z, hd, y = scenery._pose({"piece": s.get("piece", 0), "arc": -1400, "side": 1200}, track)
+                out["scenery"].append({"index": i, "name": "kit:" + s["kit"], "x": round(x), "z": round(z), "heading": round(hd, 1), "bbox": None})
+                continue
             x, z, hd, y = scenery._pose(s, track)
-            out["scenery"].append({"index": i, "name": s.get("name", "?"), "x": round(x), "z": round(z), "heading": round(hd, 1)})
+            bb = objs.get(s.get("name", ""), {}).get("bbox")
+            out["scenery"].append({"index": i, "name": s.get("name", "?"), "x": round(x), "z": round(z), "heading": round(hd, 1), "y": round(y),
+                                   "bbox": [bb["x"][0], bb["z"][0], bb["x"][1], bb["z"][1]] if bb else None})
     except Exception as e:                                    # a stale piece index: report, don't fail the layout
         out["scenery_error"] = str(e)
     # exact segment count, as the compiler will make it; and where the start post lands (worldgen's rule)

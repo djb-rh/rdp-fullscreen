@@ -39,6 +39,12 @@
   .rt select, .rt input { padding: 2px 4px; font-size: 12px; }
   .rt .x { background: transparent; border: 0; color: var(--muted); padding: 0; } .rt .x:hover { color: var(--warn); }
   .rt .g { display: inline-block; width: 16px; height: 16px; border-radius: 50%; text-align: center; line-height: 16px; font-size: 10px; font-weight: 600; color: #1b1408; background: var(--accent); }
+  .sc { display: grid; grid-template-columns: 1fr 40px 56px 56px 44px 22px; gap: 3px; align-items: center; padding: 2px 4px; font-family: "IBM Plex Mono", Menlo, monospace; font-size: 12px; border-radius: 3px; }
+  .sc.sel { background: #33404f; } .sc input { padding: 1px 3px; font-size: 11px; width: 100%; }
+  .sc .x { background: transparent; border: 0; color: var(--muted); padding: 0; } .sc .x:hover { color: var(--warn); }
+  .sc .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  #scenery { max-height: 160px; overflow: auto; }
+  #objpalette .part .meta { font-size: 11px; }
   #log { font-family: "IBM Plex Mono", Menlo, monospace; font-size: 11px; white-space: pre-wrap; background: #121417; border: 1px solid var(--rule); border-radius: 3px; padding: 6px; max-height: 180px; overflow: auto; color: var(--muted); }
   .hand { display: inline-flex; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
   .hand button { border: 0; border-radius: 0; padding: 3px 9px; background: transparent; } .hand button.on { background: var(--accent); color: #1b1408; }
@@ -60,7 +66,11 @@
   <kbd>click a part to append · Delete removes · R flips · drag pans · wheel zooms</kbd>
 </header>
 
-<aside id="palette"></aside>
+<aside id="left">
+  <div class="row" style="margin-bottom:6px"><span class="hand"><button id="tabParts" class="on">parts</button><button id="tabObjs">scenery</button></span></div>
+  <div id="palette"></div>
+  <div id="objpalette" hidden></div>
+</aside>
 
 <div id="planwrap">
   <canvas id="plan"></canvas>
@@ -75,6 +85,12 @@
   <div id="chain"></div>
   <div class="row">
     <button id="up">↑</button><button id="down">↓</button><button id="flip">flip hand</button><button id="del">delete</button>
+  </div>
+  <h2>Scenery</h2>
+  <div id="scenery"></div>
+  <div class="row">
+    <label class="row"><input id="autosigns" type="checkbox"> auto curve signs</label>
+    <span style="flex:1"></span><kbd>click an object to add it beside the selected piece · drag it on the plan</kbd>
   </div>
   <h2>Route</h2>
   <div id="route"></div>
@@ -96,7 +112,8 @@
 
 <script>
 const $ = s => document.querySelector(s);
-let NAMES = [];
+let NAMES = [], OBJS = {}, selSc = -1, dragSc = null;
+const OBJ_CLASSES = ["prop", "sign", "hill", "building", "structure", "ground", "vehicle"];
 const MARKERS = [[1, "start", "S"], [2, "finish", "F"], [4, "gate", "G"], [8, "re-arm", "R"], [0, "section", "N"]];
 let PARTS = {}, design = {start: [150000, 150000, 90], close: true, chain: [], scenery: [], route: [{piece: 0, marker: 1, name: 0}], start_piece: 0, start_offset: 0, auto_signs: true};
 let L = null, sel = -1, hover = -1, hand = 0, view = {x: 0, z: 0, k: 0.004}, dragging = null;
@@ -126,6 +143,77 @@ function buildPalette() {
   }
 }
 
+function buildObjPalette() {
+  const el = $("#objpalette"); el.innerHTML = "";
+  for (const c of OBJ_CLASSES) {
+    const names = Object.entries(OBJS).filter(([n, o]) => o.class === c).map(([n]) => n).sort();
+    if (!names.length) continue;
+    const h = document.createElement("h2"); h.textContent = c; el.appendChild(h);
+    for (const n of names) {
+      const o = OBJS[n]; const d = document.createElement("div"); d.className = "part";
+      const w = o.bbox ? Math.round(o.bbox.x[1] - o.bbox.x[0]) : "?", l = o.bbox ? Math.round(o.bbox.z[1] - o.bbox.z[0]) : "?";
+      d.innerHTML = `<span>${n}</span><span class="meta">${w}×${l}</span>`;
+      d.title = `${c}: ${o.faces} faces, cull ${o.cull}, stock use ${JSON.stringify(o.stock_use || {})}`;
+      d.onclick = () => addScenery(n);
+      el.appendChild(d);
+    }
+  }
+}
+function addScenery(name) {
+  const piece = sel >= 0 ? sel : 0;
+  const o = OBJS[name] || {}; const side = o.class === "hill" ? 4000 : o.class === "building" ? 600 : 1200;
+  design.scenery = design.scenery || [];
+  design.scenery.push({name, piece, arc: 1000, side, heading: 0});
+  selSc = design.scenery.length - 1; relayout();
+}
+function renderScenery() {
+  const el = $("#scenery"); el.innerHTML = "";
+  design.scenery = design.scenery || [];
+  $("#autosigns").checked = !!design.auto_signs;
+  design.scenery.forEach((sc, i) => {
+    const d = document.createElement("div"); d.className = "sc" + (i === selSc ? " sel" : "");
+    if (sc.kit) {
+      d.innerHTML = `<span class="nm" title="composite kit">kit ${sc.kit}</span><input type="number" value="${sc.piece ?? 0}" title="piece"><input type="number" value="${sc.speed ?? ""}" placeholder="speed" title="speed"><span></span><span></span><button class="x">✕</button>`;
+      d.children[1].onchange = e => { sc.piece = +e.target.value; relayout(); };
+      d.children[2].onchange = e => { sc.speed = +e.target.value; relayout(); };
+    } else if ("piece" in sc) {
+      d.innerHTML = `<span class="nm">${sc.name}</span><input type="number" value="${sc.piece}" title="piece"><input type="number" step="100" value="${sc.arc ?? 0}" title="arc along the piece from its entry"><input type="number" step="100" value="${sc.side ?? 0}" title="side: + right of travel, - left"><input type="number" step="15" value="${sc.heading ?? ""}" placeholder="auto" title="heading relative to travel; blank = buildings face the road"><button class="x">✕</button>`;
+      d.children[1].onchange = e => { sc.piece = +e.target.value; relayout(); };
+      d.children[2].onchange = e => { sc.arc = +e.target.value; relayout(); };
+      d.children[3].onchange = e => { sc.side = +e.target.value; relayout(); };
+      d.children[4].onchange = e => { if (e.target.value === "") delete sc.heading; else sc.heading = +e.target.value; relayout(); };
+    } else {
+      d.innerHTML = `<span class="nm">${sc.name}</span><span class="meta">abs</span><input type="number" step="100" value="${sc.x}" title="x"><input type="number" step="100" value="${sc.z}" title="z"><input type="number" step="15" value="${sc.heading ?? 0}" title="heading"><button class="x">✕</button>`;
+      d.children[2].onchange = e => { sc.x = +e.target.value; relayout(); };
+      d.children[3].onchange = e => { sc.z = +e.target.value; relayout(); };
+      d.children[4].onchange = e => { sc.heading = +e.target.value; relayout(); };
+    }
+    d.children[0].onclick = () => { selSc = i; renderScenery(); draw(); };
+    d.lastElementChild.onclick = () => { design.scenery.splice(i, 1); selSc = -1; relayout(); };
+    el.appendChild(d);
+  });
+}
+// world point -> nearest (piece, arc along it, side) using the drawn centrelines
+function trackRelative(wx, wz) {
+  let best = null;
+  for (const p of L.pieces) {
+    let arc = 0;
+    for (let i = 0; i + 1 < p.centre.length; i++) {
+      const [x0, z0] = p.centre[i], [x1, z1] = p.centre[i + 1];
+      const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz) || 1;
+      let t = ((wx - x0) * dx + (wz - z0) * dz) / (len * len); t = Math.max(0, Math.min(1, t));
+      const px = x0 + dx * t, pz = z0 + dz * t, d = Math.hypot(wx - px, wz - pz);
+      if (!best || d < best.d) {
+        // side: + right of travel, where heading = atan2(dx, dz); right-hand normal = (dz, -dx)/len
+        const side = ((wx - px) * dz - (wz - pz) * dx) / len;
+        best = {d, piece: p.index, arc: Math.round(arc + len * t), side: Math.round(side)};
+      }
+      arc += len;
+    }
+  }
+  return best;
+}
+
 function append(name) {
   const at = sel >= 0 ? sel + 1 : design.chain.length;
   design.chain.splice(at, 0, [name, hand]);
@@ -146,7 +234,7 @@ function relayout() {
   relayoutTimer = setTimeout(async () => {
     L = await api("/api/layout", design);
     if (L.error) { $("#log").textContent = "layout: " + L.error; L = null; }
-    renderChain(); renderRoute(); renderStats(); draw();
+    renderChain(); renderScenery(); renderRoute(); renderStats(); draw();
   }, 30);
 }
 
@@ -282,22 +370,51 @@ function draw() {
     const p = L.pieces[j.after]; const [sx, sz] = toScreen(p.exit[0], p.exit[1]);
     ctx.strokeStyle = "#e07a7a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sz, 7 * devicePixelRatio, 0, 7); ctx.stroke();
   }
-  // scenery
-  ctx.fillStyle = "#cbb27a";
-  for (const s of L.scenery) { const [sx, sz] = toScreen(s.x, s.z); ctx.fillRect(sx - 2, sz - 2, 4, 4); }
+  // scenery: footprint from the model bbox turned to its heading, name when zoomed in
+  for (const s of L.scenery) {
+    const [sx, sz] = toScreen(s.x, s.z); const on = s.index === selSc;
+    ctx.strokeStyle = on ? "#e8a24a" : "#cbb27a"; ctx.fillStyle = on ? "rgba(232,162,74,0.35)" : "rgba(203,178,122,0.25)"; ctx.lineWidth = (on ? 2 : 1) * devicePixelRatio;
+    if (s.bbox && view.k * devicePixelRatio > 0.004) {
+      const h = s.heading * Math.PI / 180, c = Math.cos(h), sn = Math.sin(h);
+      const [x0, z0, x1, z1] = s.bbox; ctx.beginPath();
+      [[x0, z0], [x1, z0], [x1, z1], [x0, z1]].forEach(([mx, mz], i) => {
+        const wx = s.x + c * mx + sn * mz, wz = s.z - sn * mx + c * mz; const [px, pz] = toScreen(wx, wz); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz);
+      });
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else { ctx.beginPath(); ctx.arc(sx, sz, 3 * devicePixelRatio, 0, 7); ctx.fill(); ctx.stroke(); }
+    if (view.k * devicePixelRatio > 0.008 || on) { ctx.fillStyle = on ? "#e8a24a" : "rgba(203,178,122,0.9)"; ctx.font = `${10 * devicePixelRatio}px IBM Plex Mono, Menlo, monospace`; ctx.textAlign = "left"; ctx.fillText(s.name, sx + 5 * devicePixelRatio, sz - 4 * devicePixelRatio); }
+  }
   // start arrow
   const [ax, az] = toScreen(design.start[0], design.start[1]); const h = design.start[2] * Math.PI / 180;
   ctx.strokeStyle = "#e8a24a"; ctx.lineWidth = 2 * devicePixelRatio; ctx.beginPath(); ctx.moveTo(ax, az); ctx.lineTo(ax + 18 * Math.sin(h) * devicePixelRatio, az - 18 * Math.cos(h) * devicePixelRatio); ctx.stroke();
 }
 
-cv.addEventListener("mousedown", e => { dragging = {x: e.clientX, y: e.clientY, vx: view.x, vz: view.z, moved: false}; cv.style.cursor = "grabbing"; });
+cv.addEventListener("mousedown", e => {
+  if (L) {
+    const r = cv.getBoundingClientRect(); const [wx, wz] = toWorld(e.clientX - r.left, e.clientY - r.top);
+    const hitR = 10 / view.k;                                   // 10 screen px
+    let best = null;
+    for (const s of L.scenery) { const d = Math.hypot(s.x - wx, s.z - wz); if (d < hitR && (!best || d < best.d)) best = {d, s}; }
+    if (best && !best.s.name.startsWith("kit:")) { dragSc = best.s.index; selSc = dragSc; renderScenery(); draw(); return; }
+  }
+  dragging = {x: e.clientX, y: e.clientY, vx: view.x, vz: view.z, moved: false}; cv.style.cursor = "grabbing";
+});
 window.addEventListener("mousemove", e => {
+  if (dragSc != null && L) {
+    const r = cv.getBoundingClientRect(); const [wx, wz] = toWorld(e.clientX - r.left, e.clientY - r.top);
+    const sc = design.scenery[dragSc]; if (!sc) { dragSc = null; return; }
+    if ("piece" in sc) { const t = trackRelative(wx, wz); if (t) { sc.piece = t.piece; sc.arc = t.arc; sc.side = t.side; } }
+    else { sc.x = Math.round(wx); sc.z = Math.round(wz); }
+    const s = L.scenery.find(q => q.index === dragSc); if (s) { s.x = Math.round(wx); s.z = Math.round(wz); }
+    draw(); return;
+  }
   if (!dragging) return;
   const dx = e.clientX - dragging.x, dy = e.clientY - dragging.y;
   if (Math.abs(dx) + Math.abs(dy) > 3) dragging.moved = true;
   view.x = dragging.vx - dx / view.k; view.z = dragging.vz + dy / view.k; draw();
 });
 window.addEventListener("mouseup", e => {
+  if (dragSc != null) { dragSc = null; relayout(); return; }
   if (dragging && !dragging.moved && L) {
     const r = cv.getBoundingClientRect(); const [wx, wz] = toWorld(e.clientX - r.left, e.clientY - r.top);
     let best = -1, bd = 1e12;
@@ -327,11 +444,14 @@ $("#addgate").onclick = () => { if (sel < 0) return; design.route.push({piece: s
 $("#addsect").onclick = () => { if (sel < 0) return; design.route.push({piece: sel, marker: 0, name: 1}); design.route.sort((a, b) => a.piece - b.piece || b.marker - a.marker); relayout(); };
 $("#startpiece").onchange = () => { design.start_piece = +$("#startpiece").value; relayout(); };
 $("#startoff").onchange = () => { design.start_offset = +$("#startoff").value; relayout(); };
+$("#tabParts").onclick = () => { $("#tabParts").classList.add("on"); $("#tabObjs").classList.remove("on"); $("#palette").hidden = false; $("#objpalette").hidden = true; };
+$("#tabObjs").onclick = () => { $("#tabObjs").classList.add("on"); $("#tabParts").classList.remove("on"); $("#palette").hidden = true; $("#objpalette").hidden = false; };
+$("#autosigns").onchange = () => { design.auto_signs = $("#autosigns").checked; relayout(); };
 $("#handR").onclick = () => { hand = 0; $("#handR").classList.add("on"); $("#handL").classList.remove("on"); };
 $("#handL").onclick = () => { hand = 1; $("#handL").classList.add("on"); $("#handR").classList.remove("on"); };
 window.addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT") return;
-  if (e.key === "Delete" || e.key === "Backspace") $("#del").onclick();
+  if (e.key === "Delete" || e.key === "Backspace") { if (selSc >= 0) { design.scenery.splice(selSc, 1); selSc = -1; relayout(); } else $("#del").onclick(); }
   else if (e.key === "r" || e.key === "R") $("#flip").onclick();
   else if (e.key === "f") fit();
   else if (e.key === "ArrowUp" && e.altKey) move(-1);
@@ -349,7 +469,7 @@ $("#load").onclick = async () => {
   const n = $("#designs").value; const d = await api("/api/design?name=" + encodeURIComponent(n));
   if (d.error) { $("#log").textContent = d.error; return; }
   design = d; $("#name").value = n; sel = -1; showStart();
-  L = await api("/api/layout", design); renderChain(); renderRoute(); renderStats(); fit();
+  selSc = -1; L = await api("/api/layout", design); renderChain(); renderScenery(); renderRoute(); renderStats(); fit();
 };
 $("#save").onclick = async () => {
   const n = $("#name").value.trim(); if (!n) { $("#log").textContent = "give the design a name first"; return; }
@@ -382,7 +502,7 @@ $("#stop").onclick = async () => { await api("/api/stop", {}); $("#log").textCon
 
 // ---------- boot ----------
 (async () => {
-  const d = await api("/api/parts"); PARTS = d.parts; NAMES = d.names || []; buildPalette();
+  const d = await api("/api/parts"); PARTS = d.parts; NAMES = d.names || []; OBJS = d.objects || {}; buildPalette(); buildObjPalette();
   await listDesigns();
   resize(); showStart();
   const first = $("#designs").value; if (first) { await $("#load").onclick(); }
