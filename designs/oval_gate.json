@@ -1,0 +1,96 @@
+{
+ "start": [
+  150000,
+  200000,
+  90.0
+ ],
+ "close": true,
+ "chain": [
+  [
+   "DOTLINE",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "DOTLINE",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ],
+  [
+   "C4572",
+   0
+  ]
+ ],
+ "scenery": [
+  {
+   "name": "BARN",
+   "piece": 0,
+   "arc": 8000,
+   "side": 3000,
+   "heading": 0
+  },
+  {
+   "name": "COW",
+   "piece": 5,
+   "arc": 4000,
+   "side": -2500
+  }
+ ],
+ "route": [
+  {
+   "piece": 0,
+   "marker": 1,
+   "name": 0
+  },
+  {
+   "piece": 3,
+   "marker": 8,
+   "name": 1
+  },
+  {
+   "piece": 5,
+   "marker": 4,
+   "name": 1
+  },
+  {
+   "piece": 9,
+   "marker": 2,
+   "name": 1
+  }
+ ],
+ "start_piece": 0,
+ "start_offset": 0,
+ "auto_signs": true,
+ "drones": {
+  "count": 2,
+  "speed": 65,
+  "oncoming": 1,
+  "oncoming_speed": 45
+ }
+}
