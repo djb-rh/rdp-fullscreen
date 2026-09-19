@@ -290,6 +290,22 @@ def _run_mame(name, rec=None):
     return {"pid": STATE["mame"].pid, "cmd": " ".join(cmd), "rec": rec}
 
 
+def changed_images(name):
+    """The staged set's files that differ from the stock zip: the EPROMs to burn."""
+    import zipfile
+    out = os.path.join(HERE, "roms_" + name, "racedriv")
+    stock = {}
+    with zipfile.ZipFile(CONFIG["romset"]) as z:
+        for n in z.namelist():
+            stock[os.path.basename(n)] = z.read(n)
+    changed = []
+    for fn in sorted(os.listdir(out)):
+        data = open(os.path.join(out, fn), "rb").read()
+        if stock.get(fn) != data:
+            changed.append((fn, data))
+    return changed
+
+
 def recordings():
     """The lap recordings on disk, with how many keyframes each holds (12 bytes per 0.2 s)."""
     from . import drones
@@ -348,6 +364,28 @@ class Handler(BaseHTTPRequestHandler):
             self._json(json.load(open(path)))
         elif u.path == "/api/build":
             self._json(STATE["build"] or {"lines": [], "done": True, "ok": None})
+        elif u.path == "/api/eprom":
+            # a zip of the images that differ from stock, for the programmer: only the user's own build leaves the machine
+            import zipfile
+            name = os.path.basename(q.get("name", [""])[0])
+            if not os.path.isdir(os.path.join(HERE, "roms_" + name, "racedriv")):
+                return self._json({"error": "build it first"}, 400)
+            changed = changed_images(name)
+            bio = io.BytesIO()
+            with zipfile.ZipFile(bio, "w", zipfile.ZIP_DEFLATED) as z:
+                for fn, data in changed:
+                    z.writestr(fn, data)
+                z.writestr("README.txt", "Race Drivin' track '%s': burn these in place of the stock parts of the same number.\n%s\n" % (
+                    name, "\n".join("  %s  %d bytes (27C%s)" % (fn, len(d), "512" if len(d) == 65536 else "256" if len(d) == 32768 else "?") for fn, d in changed)))
+            body = bio.getvalue()
+            self.send_response(200); self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Disposition", 'attachment; filename="%s_eproms.zip"' % name); self.send_header("Content-Length", str(len(body)))
+            self.end_headers(); self.wfile.write(body)
+        elif u.path == "/api/changed":
+            name = os.path.basename(q.get("name", [""])[0])
+            if not os.path.isdir(os.path.join(HERE, "roms_" + name, "racedriv")):
+                return self._json([])
+            self._json([{"file": fn, "bytes": len(d)} for fn, d in changed_images(name)])
         elif u.path == "/api/recordings":
             self._json(recordings())
         elif u.path == "/api/status":
@@ -387,6 +425,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "build it first"}, 400)
             rec = "recordings/%s_%s.rec" % (name, time.strftime("%Y%m%d_%H%M%S"))
             self._json(_run_mame(name, rec))
+        elif u.path == "/api/delete":
+            name = os.path.basename(q.get("name", [""])[0])
+            path = os.path.join(DESIGNS, name + ".json")
+            if name and os.path.exists(path):
+                os.rename(path, os.path.join(DESIGNS, "." + name + ".json.deleted"))     # kept, just hidden
+                return self._json({"deleted": name})
+            self._json({"error": "no such design"}, 404)
         elif u.path == "/api/stop":
             m = STATE["mame"]
             if m and m.poll() is None:

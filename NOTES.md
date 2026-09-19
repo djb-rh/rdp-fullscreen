@@ -2294,3 +2294,13 @@ panels, each writing the design format the compiler already reads:
   keyframe count and a checkbox that adds them to design.drones.recordings.
 Not yet exercised by a human: recording a lap through the page (needs someone
 at the wheel).
+
+**Editor, second pass (2026-09-19, later still).**  Undo/redo (Cmd/Ctrl+Z,
+snapshots of the design on every change), insert before/after the selected
+piece, an elevation strip under the plan (the chain's centreline elevation
+with piece boundaries, positive up), Duplicate/Delete designs (delete hides
+the file as .NAME.json.deleted), and "EPROM images": a zip of the staged
+files that differ from the stock zip - for every build so far the DSK pair
+136077-4030.30e/4031.10e and the main pair 136077-1011.210w/1012.200w (the
+drone paths), all 27C512 - with a README naming them.  Only the user's own
+build leaves the machine.

@@ -22,7 +22,8 @@
   .part:hover { background: #2b3038; } .part .meta { color: var(--muted); }
   #plan { display: block; width: 100%; height: 100%; background: var(--grass); cursor: grab; }
   #planwrap { position: relative; overflow: hidden; }
-  #readout { position: absolute; left: 10px; bottom: 8px; font-family: "IBM Plex Mono", Menlo, monospace; font-size: 11px; color: var(--muted); pointer-events: none; }
+  #elev { position: absolute; left: 0; right: 0; bottom: 0; height: 72px; width: 100%; background: rgba(20,22,26,0.85); border-top: 1px solid var(--rule); pointer-events: none; }
+  #readout { position: absolute; left: 10px; bottom: 78px; font-family: "IBM Plex Mono", Menlo, monospace; font-size: 11px; color: var(--muted); pointer-events: none; }
   #chain { flex: 1; overflow: auto; min-height: 120px; }
   .link { display: grid; grid-template-columns: 24px 1fr auto; gap: 4px; align-items: center; padding: 3px 4px; border-radius: 3px; font-family: "IBM Plex Mono", Menlo, monospace; font-size: 12px; cursor: pointer; }
   .link.sel { background: #33404f; } .link .n { color: var(--muted); } .link .kink { color: var(--muted); font-size: 11px; }
@@ -48,6 +49,7 @@
   .rec { display: grid; grid-template-columns: 18px 1fr auto; gap: 6px; align-items: center; padding: 2px 4px; font-family: "IBM Plex Mono", Menlo, monospace; font-size: 12px; }
   .rec .meta { color: var(--muted); }
   #log { font-family: "IBM Plex Mono", Menlo, monospace; font-size: 11px; white-space: pre-wrap; background: #121417; border: 1px solid var(--rule); border-radius: 3px; padding: 6px; max-height: 180px; overflow: auto; color: var(--muted); }
+  a.btn { display: inline-block; font: inherit; color: var(--ink); background: #272b31; border: 1px solid var(--rule); border-radius: 3px; padding: 4px 8px; text-decoration: none; } a.btn:hover { border-color: var(--accent); }
   .hand { display: inline-flex; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
   .hand button { border: 0; border-radius: 0; padding: 3px 9px; background: transparent; } .hand button.on { background: var(--accent); color: #1b1408; }
   kbd { font-family: "IBM Plex Mono", Menlo, monospace; font-size: 11px; color: var(--muted); }
@@ -61,11 +63,15 @@
   <button id="load">Load</button>
   <button id="save">Save</button>
   <button id="new">New</button>
+  <button id="dup" title="save a copy under a new name">Duplicate</button>
+  <button id="delete" title="hide the design file (kept as .NAME.json.deleted)">Delete</button>
+  <button id="undo" title="undo (Cmd/Ctrl+Z)">↶</button><button id="redo" title="redo (Shift+Cmd/Ctrl+Z)">↷</button>
   <span style="flex:1"></span>
   <span class="hand" title="hand for the next piece: a right-hand curve model driven backwards turns left">
     <button id="handR" class="on">right</button><button id="handL">left</button>
   </span>
-  <kbd>click a part to append · Delete removes · R flips · drag pans · wheel zooms</kbd>
+  <span class="hand" title="where a clicked part goes relative to the selected piece"><button id="insAfter" class="on">after</button><button id="insBefore">before</button></span>
+  <kbd>click a part to insert · Delete removes · R flips · drag pans · wheel zooms · f fits</kbd>
 </header>
 
 <aside id="left">
@@ -77,6 +83,7 @@
 <div id="planwrap">
   <canvas id="plan"></canvas>
   <div id="readout"></div>
+  <canvas id="elev" title="elevation along the chain (positive up); relief pieces are where the road leaves the ground"></canvas>
 </div>
 
 <aside class="right">
@@ -117,13 +124,23 @@
   <h2>Checks</h2>
   <div id="checks" class="checks"></div>
   <h2>Build and drive</h2>
-  <div class="row"><button id="build" class="primary">Build set</button><button id="drive">Drive in MAME</button><button id="stop">Stop MAME</button></div>
+  <div class="row"><button id="build" class="primary">Build set</button><button id="drive">Drive in MAME</button><button id="stop">Stop MAME</button><a id="eprom" class="btn" title="zip of the images that differ from stock, to burn">EPROM images</a></div>
+  <div id="changed" class="stats"></div>
   <div id="log">ready</div>
 </aside>
 
 <script>
 const $ = s => document.querySelector(s);
-let NAMES = [], OBJS = {}, selSc = -1, dragSc = null;
+let NAMES = [], OBJS = {}, selSc = -1, dragSc = null, insBefore = false;
+const UNDO = [], REDO = []; let lastSnap = null;
+function snapshot() { return JSON.stringify(design); }
+function remember() {                       // called by relayout: push the previous state when the design changed
+  const now = snapshot();
+  if (lastSnap !== null && now !== lastSnap) { UNDO.push(lastSnap); if (UNDO.length > 200) UNDO.shift(); REDO.length = 0; }
+  lastSnap = now;
+}
+function undo() { if (!UNDO.length) return; REDO.push(snapshot()); design = JSON.parse(UNDO.pop()); lastSnap = snapshot(); sel = Math.min(sel, design.chain.length - 1); selSc = -1; showStart(); relayout(true); }
+function redo() { if (!REDO.length) return; UNDO.push(snapshot()); design = JSON.parse(REDO.pop()); lastSnap = snapshot(); sel = Math.min(sel, design.chain.length - 1); selSc = -1; showStart(); relayout(true); }
 const OBJ_CLASSES = ["prop", "sign", "hill", "building", "structure", "ground", "vehicle"];
 const MARKERS = [[1, "start", "S"], [2, "finish", "F"], [4, "gate", "G"], [8, "re-arm", "R"], [0, "section", "N"]];
 let PARTS = {}, design = {start: [150000, 150000, 90], close: true, chain: [], scenery: [], route: [{piece: 0, marker: 1, name: 0}], start_piece: 0, start_offset: 0, auto_signs: true};
@@ -226,7 +243,7 @@ function trackRelative(wx, wz) {
 }
 
 function append(name) {
-  const at = sel >= 0 ? sel + 1 : design.chain.length;
+  const at = sel >= 0 ? (insBefore ? sel : sel + 1) : design.chain.length;
   design.chain.splice(at, 0, [name, hand]);
   sel = at; relayout();
 }
@@ -240,7 +257,8 @@ function showStart() {
 }
 
 let relayoutTimer = null;
-function relayout() {
+function relayout(noRemember) {
+  if (!noRemember) remember();
   clearTimeout(relayoutTimer);
   relayoutTimer = setTimeout(async () => {
     L = await api("/api/layout", design);
@@ -347,11 +365,39 @@ function fit() {
   for (const p of L.pieces) for (const [x, z] of p.outline) { xs.push(x); zs.push(z); }
   const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
   view.x = (x0 + x1) / 2; view.z = (z0 + z1) / 2;
-  view.k = Math.min(cv.width / (x1 - x0 + 20000), cv.height / (z1 - z0 + 20000)) / devicePixelRatio;
+  const strip = 72 * devicePixelRatio;                      // the elevation strip covers the bottom of the plan
+  view.k = Math.min(cv.width / (x1 - x0 + 20000), (cv.height - strip) / (z1 - z0 + 20000)) / devicePixelRatio;
+  view.z -= (strip / 2) / (view.k * devicePixelRatio);
   draw();
 }
 
+const ev = $("#elev"), ectx = ev.getContext("2d");
+function drawElev() {
+  const r = ev.getBoundingClientRect(); ev.width = r.width * devicePixelRatio; ev.height = r.height * devicePixelRatio;
+  ectx.clearRect(0, 0, ev.width, ev.height);
+  if (!L || !L.pieces.length) return;
+  const pts = []; let arc = 0;
+  for (const p of L.pieces) {
+    for (let i = 0; i < p.centre.length; i++) {
+      if (i) arc += Math.hypot(p.centre[i][0] - p.centre[i-1][0], p.centre[i][1] - p.centre[i-1][1]);
+      pts.push([arc, -p.centre[i][2], p.index]);                 // elevation is positive DOWN in the ROM; show up
+    }
+  }
+  const total = arc || 1; let lo = Math.min(...pts.map(q => q[1])), hi = Math.max(...pts.map(q => q[1]));
+  if (hi - lo < 1000) { const m = (hi + lo) / 2; lo = m - 500; hi = m + 500; }
+  const X = a => 8 * devicePixelRatio + (a / total) * (ev.width - 16 * devicePixelRatio), Y = e => ev.height - 10 * devicePixelRatio - ((e - lo) / (hi - lo)) * (ev.height - 22 * devicePixelRatio);
+  ectx.strokeStyle = "rgba(255,255,255,0.12)"; ectx.lineWidth = 1; ectx.beginPath(); ectx.moveTo(X(0), Y(0)); ectx.lineTo(X(total), Y(0)); ectx.stroke();
+  // piece boundaries
+  let a2 = 0; ectx.fillStyle = "rgba(255,255,255,0.35)"; ectx.font = `${9 * devicePixelRatio}px IBM Plex Mono, Menlo, monospace`; ectx.textAlign = "left";
+  for (const p of L.pieces) { ectx.fillRect(X(a2), 4 * devicePixelRatio, 1, ev.height); ectx.fillText(p.index, X(a2) + 2 * devicePixelRatio, 12 * devicePixelRatio); a2 += p.length; }
+  ectx.beginPath(); pts.forEach(([a, e], i) => i ? ectx.lineTo(X(a), Y(e)) : ectx.moveTo(X(a), Y(e)));
+  ectx.strokeStyle = "#e8a24a"; ectx.lineWidth = 1.5 * devicePixelRatio; ectx.stroke();
+  if (sel >= 0) { let a0 = 0; for (const p of L.pieces) { if (p.index === sel) { ectx.fillStyle = "rgba(91,106,124,0.45)"; ectx.fillRect(X(a0), 0, X(a0 + p.length) - X(a0), ev.height); break; } a0 += p.length; } }
+  ectx.fillStyle = "rgba(255,255,255,0.5)"; ectx.textAlign = "right"; ectx.fillText(`${Math.round(hi)} .. ${Math.round(lo)} units`, ev.width - 6 * devicePixelRatio, 12 * devicePixelRatio);
+}
+
 function draw() {
+  drawElev();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = "#26301f"; ctx.fillRect(0, 0, cv.width, cv.height);
   // grid every 20000 units
@@ -480,6 +526,24 @@ $("#record").onclick = async () => {
   $("#log").textContent = r.error ? r.error : "MAME recording to " + r.rec + "\nDrive one clean lap from the grid, then press Stop MAME; the lap appears in the drones list.";
 };
 $("#stop").onclick = async () => { await api("/api/stop", {}); $("#log").textContent = "MAME stopped"; setTimeout(loadRecordings, 1500); };
+$("#undo").onclick = undo; $("#redo").onclick = redo;
+$("#insAfter").onclick = () => { insBefore = false; $("#insAfter").classList.add("on"); $("#insBefore").classList.remove("on"); };
+$("#insBefore").onclick = () => { insBefore = true; $("#insBefore").classList.add("on"); $("#insAfter").classList.remove("on"); };
+$("#dup").onclick = async () => {
+  const base = $("#name").value.trim() || "design"; const n = prompt("Save a copy as", base + "_copy"); if (!n) return;
+  readStart(); const r = await api("/api/design?name=" + encodeURIComponent(n), design);
+  $("#log").textContent = r.saved ? "saved " + r.saved : JSON.stringify(r); $("#name").value = n; await listDesigns(); $("#designs").value = n;
+};
+$("#delete").onclick = async () => {
+  const n = $("#designs").value; if (!n || !confirm("Hide design '" + n + "'? (the file is kept as ." + n + ".json.deleted)")) return;
+  const r = await api("/api/delete?name=" + encodeURIComponent(n), {}); $("#log").textContent = JSON.stringify(r); await listDesigns();
+};
+async function showChanged() {
+  const n = $("#name").value.trim(); const el = $("#changed"); if (!n) { el.innerHTML = ""; return; }
+  const ch = await api("/api/changed?name=" + encodeURIComponent(n));
+  $("#eprom").href = "/api/eprom?name=" + encodeURIComponent(n);
+  el.innerHTML = ch.length ? ch.map(c => `<span>${c.file}</span><span>${c.bytes === 65536 ? "27C512" : c.bytes === 32768 ? "27C256" : c.bytes + " B"}</span>`).join("") : "";
+}
 $("#tabParts").onclick = () => { $("#tabParts").classList.add("on"); $("#tabObjs").classList.remove("on"); $("#palette").hidden = false; $("#objpalette").hidden = true; };
 $("#tabObjs").onclick = () => { $("#tabObjs").classList.add("on"); $("#tabParts").classList.remove("on"); $("#palette").hidden = true; $("#objpalette").hidden = false; };
 $("#autosigns").onchange = () => { design.auto_signs = $("#autosigns").checked; relayout(); };
@@ -487,6 +551,7 @@ $("#handR").onclick = () => { hand = 0; $("#handR").classList.add("on"); $("#han
 $("#handL").onclick = () => { hand = 1; $("#handL").classList.add("on"); $("#handR").classList.remove("on"); };
 window.addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT") return;
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (e.key === "Delete" || e.key === "Backspace") { if (selSc >= 0) { design.scenery.splice(selSc, 1); selSc = -1; relayout(); } else $("#del").onclick(); }
   else if (e.key === "r" || e.key === "R") $("#flip").onclick();
   else if (e.key === "f") fit();
@@ -505,14 +570,15 @@ $("#load").onclick = async () => {
   const n = $("#designs").value; const d = await api("/api/design?name=" + encodeURIComponent(n));
   if (d.error) { $("#log").textContent = d.error; return; }
   design = d; $("#name").value = n; sel = -1; showStart();
-  selSc = -1; L = await api("/api/layout", design); renderChain(); renderScenery(); renderRoute(); renderDrones(); renderStats(); fit();
+  selSc = -1; UNDO.length = 0; REDO.length = 0; lastSnap = snapshot();
+  L = await api("/api/layout", design); renderChain(); renderScenery(); renderRoute(); renderDrones(); renderStats(); fit(); showChanged();
 };
 $("#save").onclick = async () => {
   const n = $("#name").value.trim(); if (!n) { $("#log").textContent = "give the design a name first"; return; }
   readStart(); const r = await api("/api/design?name=" + encodeURIComponent(n), design);
   $("#log").textContent = r.saved ? "saved " + r.saved : JSON.stringify(r); await listDesigns(); $("#designs").value = n;
 };
-$("#new").onclick = () => { design = {start: [150000, 150000, 90], close: true, chain: [], scenery: [], route: [{piece: 0, marker: 1, name: 0}], start_piece: 0, start_offset: 0, auto_signs: true}; $("#name").value = ""; sel = -1; showStart(); relayout(); };
+$("#new").onclick = () => { design = {start: [150000, 150000, 90], close: true, chain: [], scenery: [], route: [{piece: 0, marker: 1, name: 0}], start_piece: 0, start_offset: 0, auto_signs: true}; $("#name").value = ""; sel = -1; UNDO.length = 0; REDO.length = 0; lastSnap = snapshot(); showStart(); relayout(true); $("#changed").innerHTML = ""; };
 
 // ---------- build / drive ----------
 let pollTimer = null;
@@ -527,7 +593,7 @@ $("#build").onclick = async () => {
     const b = await api("/api/build");
     $("#log").textContent = b.cmd + "\n" + b.lines.join("\n") + (b.done ? (b.ok ? "\n\nbuilt " + b.out : "\n\nBUILD FAILED") : "");
     $("#log").scrollTop = $("#log").scrollHeight;
-    if (b.done) { clearInterval(pollTimer); $("#build").disabled = false; }
+    if (b.done) { clearInterval(pollTimer); $("#build").disabled = false; showChanged(); }
   }, 500);
 };
 $("#drive").onclick = async () => {
