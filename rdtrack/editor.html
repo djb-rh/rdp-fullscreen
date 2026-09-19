@@ -35,6 +35,10 @@
   .check.link { cursor: pointer; } .check:hover { background: #2b3038; }
   .check i { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; background: var(--muted); }
   .check.error i { background: var(--warn); } .check.warn i { background: var(--accent); } .check.info i { background: var(--ok); }
+  .rt { display: grid; grid-template-columns: 22px 44px 1fr 1fr 22px; gap: 4px; align-items: center; padding: 2px 4px; font-family: "IBM Plex Mono", Menlo, monospace; font-size: 12px; }
+  .rt select, .rt input { padding: 2px 4px; font-size: 12px; }
+  .rt .x { background: transparent; border: 0; color: var(--muted); padding: 0; } .rt .x:hover { color: var(--warn); }
+  .rt .g { display: inline-block; width: 16px; height: 16px; border-radius: 50%; text-align: center; line-height: 16px; font-size: 10px; font-weight: 600; color: #1b1408; background: var(--accent); }
   #log { font-family: "IBM Plex Mono", Menlo, monospace; font-size: 11px; white-space: pre-wrap; background: #121417; border: 1px solid var(--rule); border-radius: 3px; padding: 6px; max-height: 180px; overflow: auto; color: var(--muted); }
   .hand { display: inline-flex; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
   .hand button { border: 0; border-radius: 0; padding: 3px 9px; background: transparent; } .hand button.on { background: var(--accent); color: #1b1408; }
@@ -72,6 +76,15 @@
   <div class="row">
     <button id="up">↑</button><button id="down">↓</button><button id="flip">flip hand</button><button id="del">delete</button>
   </div>
+  <h2>Route</h2>
+  <div id="route"></div>
+  <div class="row">
+    <button id="addgate" title="a checkpoint gate that pays award A, anchored at the selected piece's entry">gate at selected</button>
+    <button id="addsect" title="a section name change at the selected piece">section at selected</button>
+    <span style="flex:1"></span>
+    <label>car starts on <input id="startpiece" type="number" min="0" style="width:56px" title="start_piece: the piece the start post and the car's grid sit on"></label>
+    <label>+ <input id="startoff" type="number" step="100" style="width:70px" title="start_offset: units into that piece"></label>
+  </div>
   <h2>Layout</h2>
   <div class="stats" id="stats"></div>
   <h2>Checks</h2>
@@ -83,8 +96,10 @@
 
 <script>
 const $ = s => document.querySelector(s);
+let NAMES = [];
+const MARKERS = [[1, "start", "S"], [2, "finish", "F"], [4, "gate", "G"], [8, "re-arm", "R"], [0, "section", "N"]];
 let PARTS = {}, design = {start: [150000, 150000, 90], close: true, chain: [], scenery: [], route: [{piece: 0, marker: 1, name: 0}], start_piece: 0, start_offset: 0, auto_signs: true};
-let L = null, sel = -1, hand = 0, view = {x: 0, z: 0, k: 0.004}, dragging = null;
+let L = null, sel = -1, hover = -1, hand = 0, view = {x: 0, z: 0, k: 0.004}, dragging = null;
 const CLASS_ORDER = ["road", "slab", "banked", "bridge", "cutting", "deck", "stunt", "other"];
 
 async function api(path, body) {
@@ -131,7 +146,7 @@ function relayout() {
   relayoutTimer = setTimeout(async () => {
     L = await api("/api/layout", design);
     if (L.error) { $("#log").textContent = "layout: " + L.error; L = null; }
-    renderChain(); renderStats(); draw();
+    renderChain(); renderRoute(); renderStats(); draw();
   }, 30);
 }
 
@@ -146,6 +161,27 @@ function renderChain() {
     d.onclick = () => { sel = i; renderChain(); draw(); };
     el.appendChild(d);
   });
+}
+
+function markerGlyph(mk) { const m = MARKERS.find(x => x[0] === mk); return m ? m[2] : "?"; }
+function renderRoute() {
+  const el = $("#route"); el.innerHTML = "";
+  design.route = design.route || [];
+  design.route.forEach((r, i) => {
+    const d = document.createElement("div"); d.className = "rt";
+    const kinds = MARKERS.map(([v, lab]) => `<option value="${v}" ${r.marker === v ? "selected" : ""}>${lab}</option>`).join("");
+    const names = NAMES.map((n, k) => `<option value="${k}" ${(r.name ?? 1) === k ? "selected" : ""}>${n}</option>`).join("");
+    d.innerHTML = `<span class="g">${markerGlyph(r.marker)}</span><input type="number" min="0" value="${r.piece}" title="piece"><select title="kind">${kinds}</select><select title="section name shown on screen">${names}</select><button class="x" title="remove">✕</button>`;
+    const [pieceIn, kindSel, nameSel, rm] = [d.children[1], d.children[2], d.children[3], d.children[4]];
+    pieceIn.onchange = () => { r.piece = +pieceIn.value; relayout(); };
+    kindSel.onchange = () => { r.marker = +kindSel.value; relayout(); };
+    nameSel.onchange = () => { r.name = +nameSel.value; relayout(); };
+    rm.onclick = () => { design.route.splice(i, 1); relayout(); };
+    d.onmouseenter = () => { if (r.piece < design.chain.length) { hover = r.piece; draw(); } };
+    d.onmouseleave = () => { hover = -1; draw(); };
+    el.appendChild(d);
+  });
+  $("#startpiece").value = design.start_piece ?? 0; $("#startoff").value = design.start_offset ?? 0;
 }
 
 function renderStats() {
@@ -226,6 +262,21 @@ function draw() {
     ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.font = `${11 * devicePixelRatio}px IBM Plex Mono, Menlo, monospace`; ctx.textAlign = "center";
     ctx.fillText(`${p.index} ${p.name}${p.rev ? "⟲" : ""}`, cx, cz - 6 * devicePixelRatio);
   }
+  // route markers at the anchor piece's entry
+  for (const r of design.route || []) {
+    const p = L.pieces[r.piece]; if (!p) continue;
+    let [gx, gz] = toScreen(p.entry[0], p.entry[1]);
+    if (r.marker === 1 && L.startpost) [gx, gz] = toScreen(L.startpost[0], L.startpost[1]);
+    ctx.fillStyle = r.marker === 1 ? "#e8a24a" : r.marker === 2 ? "#e07a7a" : r.marker === 4 ? "#7fc48d" : "#9a968d";
+    ctx.beginPath(); ctx.arc(gx, gz, 8 * devicePixelRatio, 0, 7); ctx.fill();
+    ctx.fillStyle = "#1b1408"; ctx.font = `600 ${10 * devicePixelRatio}px IBM Plex Mono, Menlo, monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(markerGlyph(r.marker), gx, gz + 0.5); ctx.textBaseline = "alphabetic";
+  }
+  if (hover >= 0 && L.pieces[hover]) {
+    const p = L.pieces[hover]; ctx.beginPath();
+    p.outline.forEach(([x, z], i) => { const [sx, sz] = toScreen(x, z); i ? ctx.lineTo(sx, sz) : ctx.moveTo(sx, sz); });
+    ctx.closePath(); ctx.strokeStyle = "#e8a24a"; ctx.lineWidth = 2 * devicePixelRatio; ctx.stroke();
+  }
   // joints with a kink
   for (const j of L.joints) if (Math.abs(j.kink) > 1) {
     const p = L.pieces[j.after]; const [sx, sz] = toScreen(p.exit[0], p.exit[1]);
@@ -272,6 +323,10 @@ function move(d) { if (sel < 0) return; const j = sel + d; if (j < 0 || j >= des
 $("#up").onclick = () => move(-1); $("#down").onclick = () => move(1);
 $("#flip").onclick = () => { if (sel >= 0) { design.chain[sel][1] = design.chain[sel][1] ? 0 : 1; relayout(); } };
 $("#del").onclick = () => { if (sel >= 0) { design.chain.splice(sel, 1); sel = Math.min(sel, design.chain.length - 1); relayout(); } };
+$("#addgate").onclick = () => { if (sel < 0) return; design.route.push({piece: sel, marker: 4, name: 1}); design.route.sort((a, b) => a.piece - b.piece || b.marker - a.marker); relayout(); };
+$("#addsect").onclick = () => { if (sel < 0) return; design.route.push({piece: sel, marker: 0, name: 1}); design.route.sort((a, b) => a.piece - b.piece || b.marker - a.marker); relayout(); };
+$("#startpiece").onchange = () => { design.start_piece = +$("#startpiece").value; relayout(); };
+$("#startoff").onchange = () => { design.start_offset = +$("#startoff").value; relayout(); };
 $("#handR").onclick = () => { hand = 0; $("#handR").classList.add("on"); $("#handL").classList.remove("on"); };
 $("#handL").onclick = () => { hand = 1; $("#handL").classList.add("on"); $("#handR").classList.remove("on"); };
 window.addEventListener("keydown", e => {
@@ -294,7 +349,7 @@ $("#load").onclick = async () => {
   const n = $("#designs").value; const d = await api("/api/design?name=" + encodeURIComponent(n));
   if (d.error) { $("#log").textContent = d.error; return; }
   design = d; $("#name").value = n; sel = -1; showStart();
-  L = await api("/api/layout", design); renderChain(); renderStats(); fit();
+  L = await api("/api/layout", design); renderChain(); renderRoute(); renderStats(); fit();
 };
 $("#save").onclick = async () => {
   const n = $("#name").value.trim(); if (!n) { $("#log").textContent = "give the design a name first"; return; }
@@ -327,7 +382,7 @@ $("#stop").onclick = async () => { await api("/api/stop", {}); $("#log").textCon
 
 // ---------- boot ----------
 (async () => {
-  const d = await api("/api/parts"); PARTS = d.parts; buildPalette();
+  const d = await api("/api/parts"); PARTS = d.parts; NAMES = d.names || []; buildPalette();
   await listDesigns();
   resize(); showStart();
   const first = $("#designs").value; if (first) { await $("#load").onclick(); }

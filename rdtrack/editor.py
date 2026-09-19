@@ -223,9 +223,19 @@ def layout(design):
             out["scenery"].append({"index": i, "name": s.get("name", "?"), "x": round(x), "z": round(z), "heading": round(hd, 1)})
     except Exception as e:                                    # a stale piece index: report, don't fail the layout
         out["scenery_error"] = str(e)
-    # exact segment count, as the compiler will make it
+    # exact segment count, as the compiler will make it; and where the start post lands (worldgen's rule)
     try:
         samples, total = worldgen.sample_chain(pl)
+        sp, so = design.get("start_piece", 0), design.get("start_offset", 0)
+        first = {}
+        for i, sm in enumerate(samples):
+            first.setdefault(sm["piece"], i)
+        if sp in first:
+            post = first[sp]
+            for i, sm in enumerate(samples):
+                if sm["piece"] == sp and sm["arc"] - samples[first[sp]]["arc"] <= so:
+                    post = i
+            out["startpost"] = [round(samples[post]["x"]), round(samples[post]["z"])]
         nseg = len(worldgen.segment_records(samples, closed=bool(design.get("close"))))
     except Exception as e:
         nseg, total = None, sum(g[0][-1][3] for g in geoms)
@@ -287,7 +297,13 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers(); self.wfile.write(page)
         elif u.path == "/api/parts":
             objs = json.load(open(os.path.join(HERE, "objects.json"))) if os.path.exists(os.path.join(HERE, "objects.json")) else {}
-            self._json({"parts": chain.parts(), "objects": objs})
+            names = []
+            try:
+                doc = document.decompile(tables()["buf"]); t0 = doc["tracks"][0]
+                names = [e["name"] for e in doc["names"][t0["names"]]["entries"]]
+            except Exception as e:
+                names = ["START", "SPEED", "STUNT", "DROPOFF", "BRIDGE", "LOOP", "JUMP", "BANKED"]
+            self._json({"parts": chain.parts(), "objects": objs, "names": names})
         elif u.path == "/api/designs":
             self._json(sorted(f[:-5] for f in os.listdir(DESIGNS) if f.endswith(".json")))
         elif u.path == "/api/design":
