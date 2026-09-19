@@ -102,7 +102,8 @@ function buildPalette() {
     for (const p of byClass[c].sort((a, b) => a.name.localeCompare(b.name))) {
       const d = document.createElement("div"); d.className = "part";
       const turn = p.design ? p.design.turn : Math.round(p.turn || 0);
-      d.innerHTML = `<span>${p.name}</span><span class="meta">${Math.round(p.chord)}${turn ? " ∠" + turn : ""}</span>`;
+      const chord = isFinite(p.chord) ? Math.round(p.chord) : "";
+      d.innerHTML = `<span>${p.name}</span><span class="meta">${chord}${turn ? " ∠" + turn : ""}</span>`;
       d.title = `${p.class}: chord ${Math.round(p.chord)}, turn ${p.turn}, width ${p.width}, ${p.sections} sections`;
       d.onclick = () => { append(p.name); };
       el.appendChild(d);
@@ -160,7 +161,7 @@ function renderStats() {
     <span>closure</span><span class="${c && (Math.abs(c.dx) > 2000 || Math.abs(c.dz) > 2000 || Math.abs(c.dth) > 10) ? "bad" : ""}">${c ? `${c.dx}, ${c.dz} units, ${c.dth}°` : "open"}</span>
     <span>worst joint</span><span class="${maxKink > 2 ? "bad" : ""}">${maxKink.toFixed(2)}°, gap ${maxGap}</span>
     <span>placements</span><span>${st.placements == null ? "?" : st.placements}</span>
-    <span>polygons</span><span class="${st.poly_worst > 495 ? "bad" : ""}">${st.poly_worst == null ? "?" : st.poly_worst + " / 495 worst view"}</span>
+    <span>polygons</span><span>${st.poly_worst == null ? "?" : st.poly_worst + " in the busiest view (pool 495)"}</span>
     <span>DSK free</span><span>${st.image_free == null ? "?" : st.image_free.toLocaleString() + " bytes"}</span>
     <span>end</span><span>${st.end.join(", ")}</span>`;
   renderChecks();
