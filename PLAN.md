@@ -109,7 +109,7 @@ validator's budgets against a real build.  Includes the first recorded drone.
 
 ### Phase 2b - compact hardware with the Panorama's Stock Car track  [DONE 2026-09-11: rdtrack/stockcar.py, docs_stockcar.md; runs in MAME with traffic; awaiting a human lap and hardware]
 
-### Phase 3 - the editor
+### Phase 3 - the editor  [STARTED 2026-09-19: rdtrack/editor.py + editor.html - palette, snap chain, plan view, closure residual per joint, exact segment count, save/load designs, Build set, Drive in MAME]
 Local web app served by Python:
 * palette of parts from `parts.json`; snap-chain placement; hand flip; closure
   solver with the residual shown per joint;

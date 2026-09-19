@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Race Drivin' Track Editor</title>
+<style>
+  :root { --bg: #15171a; --panel: #1e2126; --ink: #e6e2d8; --muted: #9a968d; --rule: #33373d; --accent: #e8a24a; --road: #3d4652; --roadsel: #5b6a7c; --grass: #26301f; --warn: #e07a7a; --ok: #7fc48d; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.4 "IBM Plex Sans", system-ui, sans-serif; }
+  body { display: grid; grid-template-columns: 220px 1fr 300px; grid-template-rows: 44px 1fr; height: 100vh; }
+  header { grid-column: 1 / 4; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--rule); background: var(--panel); }
+  header h1 { font-size: 14px; font-weight: 600; margin: 0 14px 0 0; }
+  select, input, button { font: inherit; color: var(--ink); background: #272b31; border: 1px solid var(--rule); border-radius: 3px; padding: 4px 8px; }
+  input[type=number] { width: 84px; font-family: "IBM Plex Mono", Menlo, monospace; }
+  button { cursor: pointer; } button:hover { border-color: var(--accent); } button.primary { background: var(--accent); color: #1b1408; border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  aside { overflow: auto; background: var(--panel); border-right: 1px solid var(--rule); padding: 8px; }
+  aside.right { border-right: 0; border-left: 1px solid var(--rule); display: flex; flex-direction: column; gap: 8px; }
+  h2 { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 10px 0 4px; }
+  .part { display: flex; justify-content: space-between; padding: 4px 6px; border-radius: 3px; cursor: pointer; font-family: "IBM Plex Mono", Menlo, monospace; font-size: 12px; }
+  .part:hover { background: #2b3038; } .part .meta { color: var(--muted); }
+  #plan { display: block; width: 100%; height: 100%; background: var(--grass); cursor: grab; }
+  #planwrap { position: relative; overflow: hidden; }
+  #readout { position: absolute; left: 10px; bottom: 8px; font-family: "IBM Plex Mono", Menlo, monospace; font-size: 11px; color: var(--muted); pointer-events: none; }
+  #chain { flex: 1; overflow: auto; min-height: 120px; }
+  .link { display: grid; grid-template-columns: 24px 1fr auto; gap: 4px; align-items: center; padding: 3px 4px; border-radius: 3px; font-family: "IBM Plex Mono", Menlo, monospace; font-size: 12px; cursor: pointer; }
+  .link.sel { background: #33404f; } .link .n { color: var(--muted); } .link .kink { color: var(--muted); font-size: 11px; }
+  .link.kinked .kink { color: var(--warn); }
+  .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .stats { font-family: "IBM Plex Mono", Menlo, monospace; font-size: 12px; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; }
+  .stats .bad { color: var(--warn); } .stats .good { color: var(--ok); }
+  #log { font-family: "IBM Plex Mono", Menlo, monospace; font-size: 11px; white-space: pre-wrap; background: #121417; border: 1px solid var(--rule); border-radius: 3px; padding: 6px; max-height: 180px; overflow: auto; color: var(--muted); }
+  .hand { display: inline-flex; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
+  .hand button { border: 0; border-radius: 0; padding: 3px 9px; background: transparent; } .hand button.on { background: var(--accent); color: #1b1408; }
+  kbd { font-family: "IBM Plex Mono", Menlo, monospace; font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Track editor</h1>
+  <select id="designs"></select>
+  <input id="name" placeholder="design name" style="width:140px">
+  <button id="load">Load</button>
+  <button id="save">Save</button>
+  <button id="new">New</button>
+  <span style="flex:1"></span>
+  <span class="hand" title="hand for the next piece: a right-hand curve model driven backwards turns left">
+    <button id="handR" class="on">right</button><button id="handL">left</button>
+  </span>
+  <kbd>click a part to append · Delete removes · R flips · drag pans · wheel zooms</kbd>
+</header>
+
+<aside id="palette"></aside>
+
+<div id="planwrap">
+  <canvas id="plan"></canvas>
+  <div id="readout"></div>
+</div>
+
+<aside class="right">
+  <h2>Start pose</h2>
+  <div class="row">x <input id="sx" type="number" step="100"> z <input id="sz" type="number" step="100"> hdg <input id="sh" type="number" step="1" style="width:64px"></div>
+  <label class="row"><input id="close" type="checkbox"> close the loop (spread the residual over the joints)</label>
+  <h2>Chain</h2>
+  <div id="chain"></div>
+  <div class="row">
+    <button id="up">↑</button><button id="down">↓</button><button id="flip">flip hand</button><button id="del">delete</button>
+  </div>
+  <h2>Layout</h2>
+  <div class="stats" id="stats"></div>
+  <h2>Build and drive</h2>
+  <div class="row"><button id="build" class="primary">Build set</button><button id="drive">Drive in MAME</button><button id="stop">Stop MAME</button></div>
+  <div id="log">ready</div>
+</aside>
+
+<script>
+const $ = s => document.querySelector(s);
+let PARTS = {}, design = {start: [150000, 150000, 90], close: true, chain: [], scenery: [], route: [{piece: 0, marker: 1, name: 0}], start_piece: 0, start_offset: 0, auto_signs: true};
+let L = null, sel = -1, hand = 0, view = {x: 0, z: 0, k: 0.004}, dragging = null;
+const CLASS_ORDER = ["road", "slab", "banked", "bridge", "cutting", "deck", "stunt", "other"];
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  return r.json();
+}
+
+function buildPalette() {
+  const byClass = {};
+  for (const [n, p] of Object.entries(PARTS)) (byClass[p.class] = byClass[p.class] || []).push(p);
+  const el = $("#palette"); el.innerHTML = "";
+  for (const c of CLASS_ORDER.concat(Object.keys(byClass).filter(k => !CLASS_ORDER.includes(k)))) {
+    if (!byClass[c]) continue;
+    const h = document.createElement("h2"); h.textContent = c; el.appendChild(h);
+    for (const p of byClass[c].sort((a, b) => a.name.localeCompare(b.name))) {
+      const d = document.createElement("div"); d.className = "part";
+      const turn = p.design ? p.design.turn : Math.round(p.turn || 0);
+      d.innerHTML = `<span>${p.name}</span><span class="meta">${Math.round(p.chord)}${turn ? " ∠" + turn : ""}</span>`;
+      d.title = `${p.class}: chord ${Math.round(p.chord)}, turn ${p.turn}, width ${p.width}, ${p.sections} sections`;
+      d.onclick = () => { append(p.name); };
+      el.appendChild(d);
+    }
+  }
+}
+
+function append(name) {
+  const at = sel >= 0 ? sel + 1 : design.chain.length;
+  design.chain.splice(at, 0, [name, hand]);
+  sel = at; relayout();
+}
+
+function readStart() {
+  design.start = [+$("#sx").value || 0, +$("#sz").value || 0, +$("#sh").value || 0];
+  design.close = $("#close").checked;
+}
+function showStart() {
+  $("#sx").value = design.start[0]; $("#sz").value = design.start[1]; $("#sh").value = design.start[2]; $("#close").checked = !!design.close;
+}
+
+let relayoutTimer = null;
+function relayout() {
+  clearTimeout(relayoutTimer);
+  relayoutTimer = setTimeout(async () => {
+    L = await api("/api/layout", design);
+    if (L.error) { $("#log").textContent = "layout: " + L.error; L = null; }
+    renderChain(); renderStats(); draw();
+  }, 30);
+}
+
+function renderChain() {
+  const el = $("#chain"); el.innerHTML = "";
+  const joints = {}; if (L) for (const j of L.joints) joints[j.after] = j;
+  design.chain.forEach(([name, rev], i) => {
+    const d = document.createElement("div"); d.className = "link" + (i === sel ? " sel" : "");
+    const j = joints[i]; const kinkTxt = j ? `${j.kink.toFixed(1)}° ${j.gap}` : "";
+    if (j && Math.abs(j.kink) > 2) d.classList.add("kinked");
+    d.innerHTML = `<span class="n">${i}</span><span>${name}${rev ? " ⟲" : ""}</span><span class="kink" title="heading kink and gap at the joint after this piece">${kinkTxt}</span>`;
+    d.onclick = () => { sel = i; renderChain(); draw(); };
+    el.appendChild(d);
+  });
+}
+
+function renderStats() {
+  const s = $("#stats");
+  if (!L) { s.innerHTML = ""; return; }
+  const st = L.stats, c = L.closure;
+  const segBad = st.segments != null && st.segments > st.segment_limit;
+  let maxKink = 0, maxGap = 0; for (const j of L.joints) { maxKink = Math.max(maxKink, Math.abs(j.kink)); maxGap = Math.max(maxGap, j.gap); }
+  s.innerHTML = `
+    <span>pieces</span><span>${st.pieces}</span>
+    <span>length</span><span>${st.length.toLocaleString()} units (${(st.length * 7.62 / 1000 / 1000).toFixed(2)} km)</span>
+    <span>segments</span><span class="${segBad ? "bad" : "good"}">${st.segments == null ? "?" : st.segments} / ${st.segment_limit}</span>
+    <span>closure</span><span class="${c && (Math.abs(c.dx) > 2000 || Math.abs(c.dz) > 2000 || Math.abs(c.dth) > 10) ? "bad" : ""}">${c ? `${c.dx}, ${c.dz} units, ${c.dth}°` : "open"}</span>
+    <span>worst joint</span><span class="${maxKink > 2 ? "bad" : ""}">${maxKink.toFixed(2)}°, gap ${maxGap}</span>
+    <span>end</span><span>${st.end.join(", ")}</span>`;
+}
+
+// ---------- plan view ----------
+const cv = $("#plan"), ctx = cv.getContext("2d");
+function resize() { const r = cv.parentElement.getBoundingClientRect(); cv.width = r.width * devicePixelRatio; cv.height = r.height * devicePixelRatio; draw(); }
+window.addEventListener("resize", resize);
+function toScreen(x, z) { return [(x - view.x) * view.k * devicePixelRatio + cv.width / 2, cv.height / 2 - (z - view.z) * view.k * devicePixelRatio]; }
+function toWorld(px, py) { return [(px * devicePixelRatio - cv.width / 2) / (view.k * devicePixelRatio) + view.x, view.z - (py * devicePixelRatio - cv.height / 2) / (view.k * devicePixelRatio)]; }
+
+function fit() {
+  if (!L || !L.pieces.length) return;
+  let xs = [], zs = [];
+  for (const p of L.pieces) for (const [x, z] of p.outline) { xs.push(x); zs.push(z); }
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
+  view.x = (x0 + x1) / 2; view.z = (z0 + z1) / 2;
+  view.k = Math.min(cv.width / (x1 - x0 + 20000), cv.height / (z1 - z0 + 20000)) / devicePixelRatio;
+  draw();
+}
+
+function draw() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#26301f"; ctx.fillRect(0, 0, cv.width, cv.height);
+  // grid every 20000 units
+  const step = 20000 * view.k * devicePixelRatio;
+  if (step > 12) {
+    ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
+    const [wx0, wz1] = toWorld(0, 0), [wx1, wz0] = toWorld(cv.width / devicePixelRatio, cv.height / devicePixelRatio);
+    for (let x = Math.floor(wx0 / 20000) * 20000; x < wx1; x += 20000) { const [sx] = toScreen(x, 0); ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, cv.height); ctx.stroke(); }
+    for (let z = Math.floor(wz0 / 20000) * 20000; z < wz1; z += 20000) { const [, sz] = toScreen(0, z); ctx.beginPath(); ctx.moveTo(0, sz); ctx.lineTo(cv.width, sz); ctx.stroke(); }
+  }
+  if (!L) return;
+  for (const p of L.pieces) {
+    ctx.beginPath();
+    p.outline.forEach(([x, z], i) => { const [sx, sz] = toScreen(x, z); i ? ctx.lineTo(sx, sz) : ctx.moveTo(sx, sz); });
+    ctx.closePath();
+    ctx.fillStyle = p.index === sel ? "#5b6a7c" : (p.class === "road" || p.class === "slab" ? "#3d4652" : p.class === "cutting" ? "#2f3a44" : "#4a4a58");
+    ctx.fill(); ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+    // centreline
+    ctx.beginPath(); p.centre.forEach(([x, z], i) => { const [sx, sz] = toScreen(x, z); i ? ctx.lineTo(sx, sz) : ctx.moveTo(sx, sz); });
+    ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.setLineDash([6, 8]); ctx.stroke(); ctx.setLineDash([]);
+    // entry tick + index
+    const [ex, ez] = toScreen(p.entry[0], p.entry[1]);
+    ctx.fillStyle = "#e8a24a"; ctx.beginPath(); ctx.arc(ex, ez, 3 * devicePixelRatio, 0, 7); ctx.fill();
+    const c = p.centre[Math.floor(p.centre.length / 2)]; const [cx, cz] = toScreen(c[0], c[1]);
+    ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.font = `${11 * devicePixelRatio}px IBM Plex Mono, Menlo, monospace`; ctx.textAlign = "center";
+    ctx.fillText(`${p.index} ${p.name}${p.rev ? "⟲" : ""}`, cx, cz - 6 * devicePixelRatio);
+  }
+  // joints with a kink
+  for (const j of L.joints) if (Math.abs(j.kink) > 1) {
+    const p = L.pieces[j.after]; const [sx, sz] = toScreen(p.exit[0], p.exit[1]);
+    ctx.strokeStyle = "#e07a7a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sz, 7 * devicePixelRatio, 0, 7); ctx.stroke();
+  }
+  // scenery
+  ctx.fillStyle = "#cbb27a";
+  for (const s of L.scenery) { const [sx, sz] = toScreen(s.x, s.z); ctx.fillRect(sx - 2, sz - 2, 4, 4); }
+  // start arrow
+  const [ax, az] = toScreen(design.start[0], design.start[1]); const h = design.start[2] * Math.PI / 180;
+  ctx.strokeStyle = "#e8a24a"; ctx.lineWidth = 2 * devicePixelRatio; ctx.beginPath(); ctx.moveTo(ax, az); ctx.lineTo(ax + 18 * Math.sin(h) * devicePixelRatio, az - 18 * Math.cos(h) * devicePixelRatio); ctx.stroke();
+}
+
+cv.addEventListener("mousedown", e => { dragging = {x: e.clientX, y: e.clientY, vx: view.x, vz: view.z, moved: false}; cv.style.cursor = "grabbing"; });
+window.addEventListener("mousemove", e => {
+  if (!dragging) return;
+  const dx = e.clientX - dragging.x, dy = e.clientY - dragging.y;
+  if (Math.abs(dx) + Math.abs(dy) > 3) dragging.moved = true;
+  view.x = dragging.vx - dx / view.k; view.z = dragging.vz + dy / view.k; draw();
+});
+window.addEventListener("mouseup", e => {
+  if (dragging && !dragging.moved && L) {
+    const r = cv.getBoundingClientRect(); const [wx, wz] = toWorld(e.clientX - r.left, e.clientY - r.top);
+    let best = -1, bd = 1e12;
+    for (const p of L.pieces) for (const [x, z] of p.centre) { const d = (x - wx) ** 2 + (z - wz) ** 2; if (d < bd) { bd = d; best = p.index; } }
+    if (best >= 0 && Math.sqrt(bd) < 3000) { sel = best; renderChain(); draw(); }
+  }
+  dragging = null; cv.style.cursor = "grab";
+});
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect(); const [wx, wz] = toWorld(e.clientX - r.left, e.clientY - r.top);
+  view.k *= Math.exp(-e.deltaY * 0.0015);
+  const [nx, nz] = toWorld(e.clientX - r.left, e.clientY - r.top);
+  view.x += wx - nx; view.z += wz - nz; draw();
+}, {passive: false});
+cv.addEventListener("mousemove", e => {
+  const r = cv.getBoundingClientRect(); const [wx, wz] = toWorld(e.clientX - r.left, e.clientY - r.top);
+  $("#readout").textContent = `${Math.round(wx)}, ${Math.round(wz)}`;
+});
+
+// ---------- chain edits ----------
+function move(d) { if (sel < 0) return; const j = sel + d; if (j < 0 || j >= design.chain.length) return; [design.chain[sel], design.chain[j]] = [design.chain[j], design.chain[sel]]; sel = j; relayout(); }
+$("#up").onclick = () => move(-1); $("#down").onclick = () => move(1);
+$("#flip").onclick = () => { if (sel >= 0) { design.chain[sel][1] = design.chain[sel][1] ? 0 : 1; relayout(); } };
+$("#del").onclick = () => { if (sel >= 0) { design.chain.splice(sel, 1); sel = Math.min(sel, design.chain.length - 1); relayout(); } };
+$("#handR").onclick = () => { hand = 0; $("#handR").classList.add("on"); $("#handL").classList.remove("on"); };
+$("#handL").onclick = () => { hand = 1; $("#handL").classList.add("on"); $("#handR").classList.remove("on"); };
+window.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === "Delete" || e.key === "Backspace") $("#del").onclick();
+  else if (e.key === "r" || e.key === "R") $("#flip").onclick();
+  else if (e.key === "f") fit();
+  else if (e.key === "ArrowUp" && e.altKey) move(-1);
+  else if (e.key === "ArrowDown" && e.altKey) move(1);
+});
+for (const id of ["#sx", "#sz", "#sh"]) $(id).addEventListener("change", () => { readStart(); relayout(); });
+$("#close").addEventListener("change", () => { readStart(); relayout(); });
+
+// ---------- designs ----------
+async function listDesigns() {
+  const names = await api("/api/designs"); const s = $("#designs"); s.innerHTML = "";
+  for (const n of names) { const o = document.createElement("option"); o.value = o.textContent = n; s.appendChild(o); }
+}
+$("#load").onclick = async () => {
+  const n = $("#designs").value; const d = await api("/api/design?name=" + encodeURIComponent(n));
+  if (d.error) { $("#log").textContent = d.error; return; }
+  design = d; $("#name").value = n; sel = -1; showStart();
+  L = await api("/api/layout", design); renderChain(); renderStats(); fit();
+};
+$("#save").onclick = async () => {
+  const n = $("#name").value.trim(); if (!n) { $("#log").textContent = "give the design a name first"; return; }
+  readStart(); const r = await api("/api/design?name=" + encodeURIComponent(n), design);
+  $("#log").textContent = r.saved ? "saved " + r.saved : JSON.stringify(r); await listDesigns(); $("#designs").value = n;
+};
+$("#new").onclick = () => { design = {start: [150000, 150000, 90], close: true, chain: [], scenery: [], route: [{piece: 0, marker: 1, name: 0}], start_piece: 0, start_offset: 0, auto_signs: true}; $("#name").value = ""; sel = -1; showStart(); relayout(); };
+
+// ---------- build / drive ----------
+let pollTimer = null;
+$("#build").onclick = async () => {
+  const n = $("#name").value.trim(); if (!n) { $("#log").textContent = "save the design under a name first"; return; }
+  await $("#save").onclick();
+  const r = await api("/api/build?name=" + encodeURIComponent(n), {});
+  if (r.error) { $("#log").textContent = r.error; return; }
+  $("#build").disabled = true;
+  clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    const b = await api("/api/build");
+    $("#log").textContent = b.cmd + "\n" + b.lines.join("\n") + (b.done ? (b.ok ? "\n\nbuilt " + b.out : "\n\nBUILD FAILED") : "");
+    $("#log").scrollTop = $("#log").scrollHeight;
+    if (b.done) { clearInterval(pollTimer); $("#build").disabled = false; }
+  }, 500);
+};
+$("#drive").onclick = async () => {
+  const n = $("#name").value.trim(); const r = await api("/api/drive?name=" + encodeURIComponent(n), {});
+  $("#log").textContent = r.error ? r.error : "MAME started (pid " + r.pid + "): keys A gas, S brake, arrows steer, K key\n" + r.cmd;
+};
+$("#stop").onclick = async () => { await api("/api/stop", {}); $("#log").textContent = "MAME stopped"; };
+
+// ---------- boot ----------
+(async () => {
+  const d = await api("/api/parts"); PARTS = d.parts; buildPalette();
+  await listDesigns();
+  resize(); showStart();
+  const first = $("#designs").value; if (first) { await $("#load").onclick(); }
+})();
+</script>
+</body>
+</html>

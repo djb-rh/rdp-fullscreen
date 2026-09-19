@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "track-editor",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "rdtrack.editor", "--port", "8765"],
+      "port": 8765
+    }
+  ]
+}

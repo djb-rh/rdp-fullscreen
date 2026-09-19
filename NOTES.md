@@ -2246,3 +2246,25 @@ track 0 -> asset 7, 1 -> 8, 2 -> 13, 3 -> 68 (byte-identical).  Tracks 1 and 2 h
 42/48/42/48/18/18/42-row strips.  The 68010 rewrites the descriptor words in VRAM
 after unpacking (the assets' own descriptor bytes vary), so export_bundle.py takes
 only the height byte from the sheet and the order from the pointers.
+
+## Track editor, first slice (2026-09-19)
+
+`python3 -m rdtrack.editor` serves rdtrack/editor.html at http://127.0.0.1:8765/
+(plain http.server, no dependencies, nothing leaves the machine).  The page is a
+palette of parts.json grouped by class, a canvas plan view (drag pans, wheel
+zooms, click selects a piece, `f` fits), the chain list with hand flip / move /
+delete, the start pose and the close flag, and the readout the compiler will
+see: exact segment count (worldgen.sample_chain + segment_records on the same
+placements), raw closure error before spreading, and the kink and gap at every
+joint (joints over 2 degrees are marked red on the plan).  Scenery entries are
+resolved with scenery._pose so they draw where the compiler will put them.
+Save writes designs/NAME.json unchanged in format (route/scenery/auto_signs
+are carried through untouched, so a chain edit can leave route piece indices
+stale - the validator slice should check that).  Build runs `rdtrack.make` in a
+subprocess and streams its log; Drive launches `hd racedriv -rompath roms_NAME
+-window -autoboot_script rd.lua` with AUTOSEL=1 AUTOSEL_DELTA=1200 DRIVE=1.
+Verified: oval and figure-8 load and lay out exactly as make places them, an
+appended C4572 shows the 45-degree closure error and the 2.4-degree per-joint
+spread, and the oval built through the page (10 placements, 67 segments).
+Next slices: the validator panel, route/gate editing on the plan, scenery
+drag, drone record/synthesise.
