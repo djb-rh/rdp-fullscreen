@@ -8,7 +8,7 @@
   :root { --bg: #15171a; --panel: #1e2126; --ink: #e6e2d8; --muted: #9a968d; --rule: #33373d; --accent: #e8a24a; --road: #3d4652; --roadsel: #5b6a7c; --grass: #26301f; --warn: #e07a7a; --ok: #7fc48d; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.4 "IBM Plex Sans", system-ui, sans-serif; }
-  body { display: grid; grid-template-columns: 220px 1fr 300px; grid-template-rows: 44px 1fr; height: 100vh; }
+  body { display: grid; grid-template-columns: 200px minmax(360px, 1fr) 300px; grid-template-rows: 44px 1fr; height: 100vh; min-width: 960px; }
   header { grid-column: 1 / 4; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--rule); background: var(--panel); }
   header h1 { font-size: 14px; font-weight: 600; margin: 0 14px 0 0; }
   select, input, button { font: inherit; color: var(--ink); background: #272b31; border: 1px solid var(--rule); border-radius: 3px; padding: 4px 8px; }
@@ -30,6 +30,11 @@
   .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .stats { font-family: "IBM Plex Mono", Menlo, monospace; font-size: 12px; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; }
   .stats .bad { color: var(--warn); } .stats .good { color: var(--ok); }
+  .checks { font-size: 12px; max-height: 200px; overflow: auto; }
+  .check { display: grid; grid-template-columns: 10px 1fr; gap: 6px; padding: 3px 4px; border-radius: 3px; cursor: default; align-items: start; }
+  .check.link { cursor: pointer; } .check:hover { background: #2b3038; }
+  .check i { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; background: var(--muted); }
+  .check.error i { background: var(--warn); } .check.warn i { background: var(--accent); } .check.info i { background: var(--ok); }
   #log { font-family: "IBM Plex Mono", Menlo, monospace; font-size: 11px; white-space: pre-wrap; background: #121417; border: 1px solid var(--rule); border-radius: 3px; padding: 6px; max-height: 180px; overflow: auto; color: var(--muted); }
   .hand { display: inline-flex; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
   .hand button { border: 0; border-radius: 0; padding: 3px 9px; background: transparent; } .hand button.on { background: var(--accent); color: #1b1408; }
@@ -69,6 +74,8 @@
   </div>
   <h2>Layout</h2>
   <div class="stats" id="stats"></div>
+  <h2>Checks</h2>
+  <div id="checks" class="checks"></div>
   <h2>Build and drive</h2>
   <div class="row"><button id="build" class="primary">Build set</button><button id="drive">Drive in MAME</button><button id="stop">Stop MAME</button></div>
   <div id="log">ready</div>
@@ -152,7 +159,25 @@ function renderStats() {
     <span>segments</span><span class="${segBad ? "bad" : "good"}">${st.segments == null ? "?" : st.segments} / ${st.segment_limit}</span>
     <span>closure</span><span class="${c && (Math.abs(c.dx) > 2000 || Math.abs(c.dz) > 2000 || Math.abs(c.dth) > 10) ? "bad" : ""}">${c ? `${c.dx}, ${c.dz} units, ${c.dth}°` : "open"}</span>
     <span>worst joint</span><span class="${maxKink > 2 ? "bad" : ""}">${maxKink.toFixed(2)}°, gap ${maxGap}</span>
+    <span>placements</span><span>${st.placements == null ? "?" : st.placements}</span>
+    <span>polygons</span><span class="${st.poly_worst > 495 ? "bad" : ""}">${st.poly_worst == null ? "?" : st.poly_worst + " / 495 worst view"}</span>
+    <span>DSK free</span><span>${st.image_free == null ? "?" : st.image_free.toLocaleString() + " bytes"}</span>
     <span>end</span><span>${st.end.join(", ")}</span>`;
+  renderChecks();
+}
+
+function renderChecks() {
+  const el = $("#checks"); el.innerHTML = "";
+  if (!L || !L.checks) return;
+  const order = {error: 0, warn: 1, info: 2};
+  const list = L.checks.slice().sort((a, b) => order[a.level] - order[b.level]);
+  if (!list.length) { el.innerHTML = '<div class="check info"><i></i><span>nothing to report</span></div>'; return; }
+  for (const c of list) {
+    const d = document.createElement("div"); d.className = "check " + c.level + (c.piece != null ? " link" : "");
+    d.innerHTML = `<i></i><span>${c.msg}</span>`;
+    if (c.piece != null) d.onclick = () => { sel = c.piece; renderChain(); draw(); };
+    el.appendChild(d);
+  }
 }
 
 // ---------- plan view ----------

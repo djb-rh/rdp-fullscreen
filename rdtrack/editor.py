@@ -10,16 +10,168 @@ builds a set with rdtrack.make and launches MAME on it.  Nothing leaves the
 machine: the stock zip is read by the compiler only, and the page has no
 network dependencies.
 """
-import argparse, json, math, os, subprocess, sys, threading, time
+import argparse, collections, contextlib, io, json, math, os, re, subprocess, sys, threading, time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-from . import chain, worldgen, scenery
+from . import chain, worldgen, scenery, dsk, document
+from . import compile as comp
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DESIGNS = os.path.join(HERE, "designs")
 CONFIG = {"romset": os.path.expanduser("~/Developer/Race Drivin/racedriv.zip"),
           "mame": os.path.expanduser("~/Developer/mame/hd")}
 STATE = {"build": None, "mame": None}       # running subprocesses and their logs
+_TABLES = None
+POOL = 495                                  # the ADSP's polygon pool (NOTES.md 2026-09-08)
+SLACK = 300                                 # units between one relief piece's hand-off and the next origin
+
+
+def tables():
+    """The ROM-derived tables rdtrack.make uses, loaded once: catalogue, object index, per-object tails, stock image."""
+    global _TABLES
+    if _TABLES is None:
+        sys.path.insert(0, HERE)
+        import world as W
+        w = W.World(); cat = {i: w.catalogue(i) for i in range(390)}; obj_index = {w.name(i): i for i in range(156)}
+        buf = dsk.load(CONFIG["romset"]); D = dsk.Dsk(buf)
+        cnt = collections.defaultdict(collections.Counter)
+        for ti in (0, 2, 1):
+            for p in D.worlds[D.tracks[ti]["descriptor"]]["placements"]:
+                cnt[w.name(p["obj"])][(p["bias"], p["flags"])] += 1
+        tails = {nm: c.most_common(1)[0][0] for nm, c in cnt.items()}
+        objs = json.load(open(os.path.join(HERE, "objects.json"))) if os.path.exists(os.path.join(HERE, "objects.json")) else {}
+        faces = {i: objs.get(w.name(i), {}).get("faces", 0) for i in range(156)}
+        _TABLES = {"w": w, "cat": cat, "obj_index": obj_index, "tails": tails, "buf": buf, "faces": faces, "name": {i: w.name(i) for i in range(156)}}
+    return _TABLES
+
+
+def validate(design, lay):
+    """Every check a real drive taught us, on the compiler's own output.  -> (checks, extra stats)."""
+    checks, extra = [], {}
+    def add(level, kind, msg, piece=None):
+        checks.append({"level": level, "kind": kind, "msg": msg, "piece": piece})
+    n = len(design.get("chain", []))
+    if n == 0:
+        return checks, extra
+    # references into the chain
+    for i, r in enumerate(design.get("route", [])):
+        if not (0 <= r.get("piece", 0) < n):
+            add("error", "route", "route entry %d points at piece %d; the chain has %d pieces" % (i, r.get("piece"), n))
+    starts = [r for r in design.get("route", []) if r.get("marker") == 1]
+    if len(starts) != 1:
+        add("error", "route", "the route needs exactly one start entry (marker 1); it has %d" % len(starts))
+    for i, sc in enumerate(design.get("scenery", [])):
+        if "piece" in sc and not (0 <= sc["piece"] < n):
+            add("error", "scenery", "scenery %d (%s) points at piece %d; the chain has %d pieces" % (i, sc.get("name"), sc["piece"], n))
+    if not (0 <= design.get("start_piece", 0) < n):
+        add("error", "route", "start_piece %d is outside the chain" % design.get("start_piece", 0))
+    # joints: individually when a few are off, one line when the whole chain carries a residual
+    bad = [j for j in lay["joints"] if abs(j["kink"]) > 2.0 or j["gap"] > 120]
+    if len(bad) > 5:
+        add("warn", "joint", "%d of %d joints are strained (up to %.1f degrees and %d units each): the chain does not close on its own" % (
+            len(bad), len(lay["joints"]), max(abs(j["kink"]) for j in bad), max(j["gap"] for j in bad)))
+    else:
+        for j in bad:
+            if abs(j["kink"]) > 2.0:
+                add("warn", "joint", "joint after piece %d kinks %.1f degrees (stock wears 1-2)" % (j["after"], j["kink"]), j["after"])
+            if j["gap"] > 120:
+                add("warn", "joint", "joint after piece %d has a %d-unit gap (the parts overlap by 40 when they meet)" % (j["after"], j["gap"]), j["after"])
+    c = lay.get("closure")
+    if c and (math.hypot(c["dx"], c["dz"]) > 3000 or abs(c["dth"]) > 6):
+        add("warn", "closure", "the chain misses its start by %d, %d units and %.1f degrees before spreading" % (c["dx"], c["dz"], c["dth"]))
+    if not design.get("close"):
+        add("info", "closure", "open chain: the route will not lap")
+    # the compiler's own pass
+    T = tables()
+    out = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out):
+            recs, cells, segs, nodes, pl, samples, entities = worldgen.expand(design, T["cat"], T["obj_index"], T["tails"])
+    except SystemExit as e:
+        add("error", "compile", "the compiler stopped: %s" % e); return checks, extra
+    except Exception as e:
+        add("error", "compile", "the compiler failed: %s: %s" % (type(e).__name__, e)); return checks, extra
+    for line in out.getvalue().splitlines():
+        line = line.strip()
+        if line.startswith("WARNING:"):
+            add("warn", "compiler", line[8:].strip())
+        elif line.startswith("crossing:"):
+            add("info", "crossing", line[9:].strip())
+    nseg = len(segs["segs"])
+    extra.update({"segments": nseg, "placements": len(recs), "route_nodes": len(nodes), "cells": [len(cl["recs"]) for cl in cells]})
+    if nseg > 720:
+        add("error", "budget", "%d segments; the DSP32C table holds 727 and the compiler caps at 720" % nseg)
+    elif nseg > 650:
+        add("warn", "budget", "%d segments of 720" % nseg)
+    # same-level crossings: any centreline crossing that is not an UNDERP under a road
+    geoms = [worldgen.piece_geometry(p) for p in pl]
+    under = {(k, j) for k, j, *_r in worldgen.crossings(pl, geoms)}
+    for k in range(len(pl)):
+        for j in range(k + 2, len(pl)):
+            if k == 0 and j == len(pl) - 1:
+                continue
+            if (k, j) in under or (j, k) in under:
+                continue
+            a_poly, b_poly = geoms[k][0], geoms[j][0]
+            hit = None
+            for a, b in zip(a_poly, a_poly[1:]):
+                for cc, d in zip(b_poly, b_poly[1:]):
+                    h = worldgen._seg_cross(a, b, cc, d)
+                    if h:
+                        hit = (a[0] + (b[0]-a[0])*h[0], a[1] + (b[1]-a[1])*h[0]); break
+                if hit: break
+            if hit:
+                add("error", "overlap", "pieces %d (%s) and %d (%s) cross at %d, %d with no underpass" % (k, pl[k]["name"], j, pl[j]["name"], hit[0], hit[1]), k)
+    # relief hand-offs: forced ownership windows must not overlap (sample_chain's rule)
+    total, windows = 0.0, []
+    for k, (poly, prof) in enumerate(geoms):
+        if prof:
+            for (s0, e0), (s1, e1) in zip(prof, prof[1:]):
+                windows.append((total + s0, total + s1, k))
+        total += poly[-1][3]
+    windows.sort()
+    for (a0, a1, k0), (b0, b1, k1) in zip(windows, windows[1:]):
+        if k0 != k1 and b0 < a1 + SLACK:
+            add("error", "handoff", "relief pieces %d (%s) and %d (%s) hand off %d units apart; leave at least %d" % (k0, pl[k0]["name"], k1, pl[k1]["name"], b0 - a1, SLACK), k1)
+    # polygon load along the track: faces of every placement within its cull of the car
+    worst = (0, None)
+    for s in samples[::4]:
+        load = 0
+        for r in recs:
+            if math.hypot(r["x"] - s["x"], r["z"] - s["z"]) <= T["cat"][r["obj"]]["cull"]:
+                load += T["faces"].get(r["obj"], 0)
+        if load > worst[0]:
+            worst = (load, s)
+    extra["poly_worst"] = worst[0]
+    if worst[1] is not None:
+        # a single driven-on road piece is already ~450 of the pool and the ADSP drops the rest by depth, so this
+        # is a density estimate, not a limit: it says where the scene is busiest
+        add("info", "polygons", "busiest view: about %d polygons within cull range at piece %d, %d units in (pool %d, sorted by depth)" % (
+            worst[0], worst[1]["piece"], worst[1]["arc"], POOL), worst[1]["piece"])
+    # the image itself
+    try:
+        doc = document.decompile(T["buf"])
+        doc["worlds"]["A"] = {"desc_words": [28, 112, 112], "cells": cells,
+                              "placements": [{k: (v.hex() if isinstance(v, bytes) else v) for k, v in p.items()} for p in recs]}
+        doc["segments"]["A"] = segs; doc["routes"]["R0"] = {"nodes": nodes}
+        for t in doc["tracks"]:
+            t["world"] = "A"; t["segments"] = "A"; t["routes"] = ["R0", "R0"]; t["names"] = doc["tracks"][0]["names"]
+            t["awards"] = doc["tracks"][0]["awards"]; t["entities"] = [entities, entities]; t["entities_at"] = [None, None]
+        for k in [k for k in doc["worlds"] if k != "A"]: del doc["worlds"][k]
+        for k in [k for k in doc["segments"] if k != "A"]: del doc["segments"][k]
+        for k in [k for k in doc["routes"] if k != "R0"]: del doc["routes"][k]
+        for k in [k for k in doc["names"] if k != doc["tracks"][0]["names"]]: del doc["names"][k]
+        with contextlib.redirect_stdout(io.StringIO()):
+            img, L = comp.compile_doc(doc, fixed=False)
+        top = max(b for a, b in L.used)
+        extra["image_free"] = comp.LIMIT - top
+        if comp.LIMIT - top < 4096:
+            add("warn", "budget", "only %d bytes free below the DSK checksum" % (comp.LIMIT - top))
+    except SystemExit as e:
+        add("error", "budget", "does not fit the DSK: %s" % e)
+    except Exception as e:
+        add("error", "compile", "compile failed: %s: %s" % (type(e).__name__, e))
+    return checks, extra
 
 
 def layout(design):
@@ -80,6 +232,11 @@ def layout(design):
         out["segments_error"] = str(e)
     out["stats"] = {"pieces": N, "length": round(total), "segments": nseg, "segment_limit": 720,
                     "end": [round(end[0]), round(end[1]), round(end[2] % 360, 2)]}
+    try:
+        checks, extra = validate(design, out)
+    except Exception as e:
+        checks, extra = [{"level": "error", "kind": "validator", "msg": "%s: %s" % (type(e).__name__, e), "piece": None}], {}
+    out["checks"] = checks; out["stats"].update(extra)
     return out
 
 
