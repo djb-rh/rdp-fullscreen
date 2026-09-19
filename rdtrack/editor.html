@@ -45,6 +45,8 @@
   .sc .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
   #scenery { max-height: 160px; overflow: auto; }
   #objpalette .part .meta { font-size: 11px; }
+  .rec { display: grid; grid-template-columns: 18px 1fr auto; gap: 6px; align-items: center; padding: 2px 4px; font-family: "IBM Plex Mono", Menlo, monospace; font-size: 12px; }
+  .rec .meta { color: var(--muted); }
   #log { font-family: "IBM Plex Mono", Menlo, monospace; font-size: 11px; white-space: pre-wrap; background: #121417; border: 1px solid var(--rule); border-radius: 3px; padding: 6px; max-height: 180px; overflow: auto; color: var(--muted); }
   .hand { display: inline-flex; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
   .hand button { border: 0; border-radius: 0; padding: 3px 9px; background: transparent; } .hand button.on { background: var(--accent); color: #1b1408; }
@@ -101,6 +103,15 @@
     <label>car starts on <input id="startpiece" type="number" min="0" style="width:56px" title="start_piece: the piece the start post and the car's grid sit on"></label>
     <label>+ <input id="startoff" type="number" step="100" style="width:70px" title="start_offset: units into that piece"></label>
   </div>
+  <h2>Drones</h2>
+  <div class="row">
+    <label>race cars <input id="dcount" type="number" min="0" max="8" style="width:52px"></label>
+    <label>speed <input id="dspeed" type="number" step="5" style="width:56px" title="mph of the fastest synthesised lap; each next car is 4 slower"></label>
+    <label>oncoming <input id="doncoming" type="number" min="0" max="4" style="width:52px"></label>
+    <label>at <input id="donspeed" type="number" step="5" style="width:56px" title="mph of the oncoming traffic"></label>
+  </div>
+  <div id="recs"></div>
+  <div class="row"><button id="record">Record a lap</button><kbd>builds must be current: drive one clean lap, then Stop MAME</kbd></div>
   <h2>Layout</h2>
   <div class="stats" id="stats"></div>
   <h2>Checks</h2>
@@ -234,7 +245,7 @@ function relayout() {
   relayoutTimer = setTimeout(async () => {
     L = await api("/api/layout", design);
     if (L.error) { $("#log").textContent = "layout: " + L.error; L = null; }
-    renderChain(); renderScenery(); renderRoute(); renderStats(); draw();
+    renderChain(); renderScenery(); renderRoute(); renderDrones(); renderStats(); draw();
   }, 30);
 }
 
@@ -271,6 +282,24 @@ function renderRoute() {
   });
   $("#startpiece").value = design.start_piece ?? 0; $("#startoff").value = design.start_offset ?? 0;
 }
+
+let RECS = [];
+function renderDrones() {
+  const d = design.drones = design.drones || {};
+  $("#dcount").value = d.count ?? 3; $("#dspeed").value = d.speed ?? 70; $("#doncoming").value = d.oncoming ?? 2; $("#donspeed").value = d.oncoming_speed ?? 45;
+  const el = $("#recs"); el.innerHTML = "";
+  const used = new Set(d.recordings || []);
+  if (!RECS.length) { el.innerHTML = '<div class="rec"><span></span><span class="meta">no recorded laps yet; synthesised laps are used</span></div>'; return; }
+  for (const r of RECS) {
+    const row = document.createElement("div"); row.className = "rec";
+    row.innerHTML = `<input type="checkbox" ${used.has(r.file) ? "checked" : ""} title="use this lap as a drone"><span>${r.file.replace("recordings/", "")}</span><span class="meta">${r.keyframes == null ? "?" : r.keyframes + " kf, " + r.seconds + " s"}</span>`;
+    row.firstElementChild.onchange = e => {
+      const list = new Set(d.recordings || []); e.target.checked ? list.add(r.file) : list.delete(r.file); d.recordings = [...list]; relayout();
+    };
+    el.appendChild(row);
+  }
+}
+async function loadRecordings() { RECS = await api("/api/recordings"); renderDrones(); }
 
 function renderStats() {
   const s = $("#stats");
@@ -444,6 +473,13 @@ $("#addgate").onclick = () => { if (sel < 0) return; design.route.push({piece: s
 $("#addsect").onclick = () => { if (sel < 0) return; design.route.push({piece: sel, marker: 0, name: 1}); design.route.sort((a, b) => a.piece - b.piece || b.marker - a.marker); relayout(); };
 $("#startpiece").onchange = () => { design.start_piece = +$("#startpiece").value; relayout(); };
 $("#startoff").onchange = () => { design.start_offset = +$("#startoff").value; relayout(); };
+for (const [id, key] of [["#dcount", "count"], ["#dspeed", "speed"], ["#doncoming", "oncoming"], ["#donspeed", "oncoming_speed"]])
+  $(id).onchange = () => { design.drones = design.drones || {}; design.drones[key] = +$(id).value; relayout(); };
+$("#record").onclick = async () => {
+  const n = $("#name").value.trim(); const r = await api("/api/record?name=" + encodeURIComponent(n), {});
+  $("#log").textContent = r.error ? r.error : "MAME recording to " + r.rec + "\nDrive one clean lap from the grid, then press Stop MAME; the lap appears in the drones list.";
+};
+$("#stop").onclick = async () => { await api("/api/stop", {}); $("#log").textContent = "MAME stopped"; setTimeout(loadRecordings, 1500); };
 $("#tabParts").onclick = () => { $("#tabParts").classList.add("on"); $("#tabObjs").classList.remove("on"); $("#palette").hidden = false; $("#objpalette").hidden = true; };
 $("#tabObjs").onclick = () => { $("#tabObjs").classList.add("on"); $("#tabParts").classList.remove("on"); $("#palette").hidden = true; $("#objpalette").hidden = false; };
 $("#autosigns").onchange = () => { design.auto_signs = $("#autosigns").checked; relayout(); };
@@ -469,7 +505,7 @@ $("#load").onclick = async () => {
   const n = $("#designs").value; const d = await api("/api/design?name=" + encodeURIComponent(n));
   if (d.error) { $("#log").textContent = d.error; return; }
   design = d; $("#name").value = n; sel = -1; showStart();
-  selSc = -1; L = await api("/api/layout", design); renderChain(); renderScenery(); renderRoute(); renderStats(); fit();
+  selSc = -1; L = await api("/api/layout", design); renderChain(); renderScenery(); renderRoute(); renderDrones(); renderStats(); fit();
 };
 $("#save").onclick = async () => {
   const n = $("#name").value.trim(); if (!n) { $("#log").textContent = "give the design a name first"; return; }
@@ -498,12 +534,11 @@ $("#drive").onclick = async () => {
   const n = $("#name").value.trim(); const r = await api("/api/drive?name=" + encodeURIComponent(n), {});
   $("#log").textContent = r.error ? r.error : "MAME started (pid " + r.pid + "): keys A gas, S brake, arrows steer, K key\n" + r.cmd;
 };
-$("#stop").onclick = async () => { await api("/api/stop", {}); $("#log").textContent = "MAME stopped"; };
 
 // ---------- boot ----------
 (async () => {
   const d = await api("/api/parts"); PARTS = d.parts; NAMES = d.names || []; OBJS = d.objects || {}; buildPalette(); buildObjPalette();
-  await listDesigns();
+  await listDesigns(); await loadRecordings();
   resize(); showStart();
   const first = $("#designs").value; if (first) { await $("#load").onclick(); }
 })();

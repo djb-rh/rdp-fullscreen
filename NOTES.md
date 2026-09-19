@@ -2268,3 +2268,29 @@ appended C4572 shows the 45-degree closure error and the 2.4-degree per-joint
 spread, and the oval built through the page (10 placements, 67 segments).
 Next slices: the validator panel, route/gate editing on the plan, scenery
 drag, drone record/synthesise.
+
+**Editor, rest of the first pass (2026-09-19, later).**  Same page, four more
+panels, each writing the design format the compiler already reads:
+* Checks - runs on every edit, in milliseconds, using the compiler itself
+  (worldgen.expand + compile.compile_doc on the stock image loaded once):
+  stale route/scenery/start_piece indices, one start entry, joint kinks over 2
+  degrees and gaps over 120 (collapsed to one line when the whole chain is
+  strained), raw closure error, the compiler's own WARNING and crossing lines,
+  segment count vs 720, same-level centreline crossings with no UNDERP,
+  relief hand-off windows closer than 300 units, DSK bytes free, and the
+  busiest view's polygon count (informational only: one road piece is ~450 of
+  the 495 pool and the ADSP sorts by depth).  Clicking a check selects its piece.
+* Route - entries as start/finish/gate/re-arm/section with the ROM's section
+  names (START, SPEED, STUNT, DROPOFF, BRIDGE, LOOP, JUMP, BANKED TURN, SPD
+  UNDERP, BRDG LDG), drawn as glyphs at the anchor piece's entry (the start at
+  the post position worldgen will choose from start_piece/start_offset).
+* Scenery - object palette by class from objects.json, entries as
+  piece/arc/side/heading (or absolute), footprints from the model bbox drawn
+  on the plan, drag to move (world point -> nearest piece, arc, side), kits
+  shown at their anchor.  Verified the conversion round-trips stock entries
+  exactly (BARRIER at arc 3000 side 1300).
+* Drones - count/speed/oncoming settings, "Record a lap" launches MAME on the
+  built set with REC=recordings/NAME_time.rec, recordings listed with their
+  keyframe count and a checkbox that adds them to design.drones.recordings.
+Not yet exercised by a human: recording a lap through the page (needs someone
+at the wheel).

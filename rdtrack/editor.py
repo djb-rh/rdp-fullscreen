@@ -278,14 +278,36 @@ def _run_build(name):
     return log
 
 
-def _run_mame(name):
+def _run_mame(name, rec=None):
     outdir = os.path.join(HERE, "roms_" + name)
     if STATE["mame"] and STATE["mame"].poll() is None:
         STATE["mame"].terminate()
     env = dict(os.environ, AUTOSEL="1", AUTOSEL_DELTA="1200", DRIVE="1")
+    if rec:
+        env["REC"] = rec                        # rd.lua dumps the game's own lap recording there every 2 s and at exit
     cmd = [CONFIG["mame"], "racedriv", "-rompath", outdir, "-window", "-autoboot_script", "rd.lua"]
     STATE["mame"] = subprocess.Popen(cmd, cwd=HERE, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return {"pid": STATE["mame"].pid, "cmd": " ".join(cmd)}
+    return {"pid": STATE["mame"].pid, "cmd": " ".join(cmd), "rec": rec}
+
+
+def recordings():
+    """The lap recordings on disk, with how many keyframes each holds (12 bytes per 0.2 s)."""
+    from . import drones
+    out = []
+    d = os.path.join(HERE, "recordings")
+    for fn in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+        if not fn.endswith(".rec"):
+            continue
+        path = os.path.join(d, fn); n = None
+        try:
+            dump = open(path, "rb").read()
+            import struct
+            ptr = struct.unpack_from(">I", dump, drones.SLOT)[0] if len(dump) >= drones.SLOT + 4 else None
+            n = (ptr - 0x90A838) // 12 if ptr else struct.unpack_from(">H", dump, 0x1C)[0]
+        except Exception:
+            pass
+        out.append({"file": "recordings/" + fn, "keyframes": n, "seconds": round(n * drones.KF_S, 1) if n else None, "mtime": int(os.path.getmtime(path))})
+    return out
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -326,6 +348,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(json.load(open(path)))
         elif u.path == "/api/build":
             self._json(STATE["build"] or {"lines": [], "done": True, "ok": None})
+        elif u.path == "/api/recordings":
+            self._json(recordings())
         elif u.path == "/api/status":
             m = STATE["mame"]
             self._json({"mame_running": bool(m and m.poll() is None), "romset": CONFIG["romset"], "mame": CONFIG["mame"]})
@@ -357,6 +381,12 @@ class Handler(BaseHTTPRequestHandler):
             if not os.path.isdir(os.path.join(HERE, "roms_" + name)):
                 return self._json({"error": "build it first"}, 400)
             self._json(_run_mame(name))
+        elif u.path == "/api/record":
+            name = os.path.basename(q.get("name", [""])[0])
+            if not os.path.isdir(os.path.join(HERE, "roms_" + name)):
+                return self._json({"error": "build it first"}, 400)
+            rec = "recordings/%s_%s.rec" % (name, time.strftime("%Y%m%d_%H%M%S"))
+            self._json(_run_mame(name, rec))
         elif u.path == "/api/stop":
             m = STATE["mame"]
             if m and m.poll() is None:
