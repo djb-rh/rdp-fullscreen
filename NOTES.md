@@ -2304,3 +2304,15 @@ files that differ from the stock zip - for every build so far the DSK pair
 136077-4030.30e/4031.10e and the main pair 136077-1011.210w/1012.200w (the
 drone paths), all 27C512 - with a README naming them.  Only the user's own
 build leaves the machine.
+
+## 2026-10-05: linked compacts, and the pod stream on Serial B
+
+- The compact program has the link game built in (operator GAME TYPE linked game 1/2, DUART
+  channel A, 38400 8N1).  Two MAME instances ran a two-player Stock Car race to lap 1:
+  `experiments/linked_compacts_mame.md`.
+- `rdtrack/podlink.py` (`stockcar --pods`) transplants the Panorama's pod-packet module into
+  the compact and sends it on Serial B: `experiments/pod_stream_serial_b.md` has the addresses,
+  the method and the MAME results.  Only 200S/210S/200T/210T change.
+- Real ADSP II sockets are 9H, 9/10H, 10H and 9K, 9/10K, 10K; MAME's `.10h` file belongs in
+  9/10H and `.10j` in 10H.  The compact + Stock Car set ran on real A046901 hardware on
+  2026-10-04 once that was right.

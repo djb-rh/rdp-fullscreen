@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Race Drivin' compact + the Panorama's Stock Car track.
 
-    python3 -m rdtrack.stockcar RACEDRIV.zip RACEDRIVPAN.zip -o OUTDIR [--slapstic free|115|117]
+    python3 -m rdtrack.stockcar RACEDRIV.zip RACEDRIVPAN.zip -o OUTDIR [--slapstic free|115|117] [--pods] [--romstack]
 
 RACEDRIV.zip is a MAME set that carries the compact ROMs (a merged racedriv.zip
 with a racedrivc/ folder inside, or a split racedrivc.zip - pass the parent zip
@@ -160,7 +160,7 @@ DSK_SIZE = 0x40000          # two 27C010s on the DSK PCB (A047724-01), as the Pa
 DSK_PARTS = [("136078-1030.30e", 0x30), ("136078-1031.10e", 0x31)]
 
 
-def build_set(blobs, out_dir, slapstic="free", verbose=print):
+def build_set(blobs, out_dir, slapstic="free", verbose=print, pods=False, romstack=False):
     # the DSK grows to 256 KB: three worlds of this size do not fit 128 KB
     dsk.SIZE = DSK_SIZE; dsk.CHECKSUM_AT = DSK_SIZE - 2; comp.LIMIT = DSK_SIZE - 2; dsk.PARTS = DSK_PARTS
     # --- images -------------------------------------------------------------------
@@ -330,6 +330,11 @@ def build_set(blobs, out_dir, slapstic="free", verbose=print):
             main[cpu:cpu + len(blob)] = blob; applied.append(what)
     verbose("program edits (%s): %d" % (slapstic, len(applied)))
 
+    # --- optional: the Panorama's pod stream on Serial B (J3) ---------------------------
+    if pods:
+        from rdtrack import podlink
+        podlink.apply(main, pmain, object_names(main, OBJTAB, OBJTAB_N), pnames, OBJTAB, verbose)
+
     # --- files -------------------------------------------------------------------------
     import shutil
     shutil.rmtree(out_dir, ignore_errors=True); os.makedirs(out_dir)
@@ -364,9 +369,90 @@ def build_set(blobs, out_dir, slapstic="free", verbose=print):
             files[n] = fix_sum(files[n], SUFFIX(n) if "-" in n else 0, pads[n])
     for n, data in files.items():
         open(os.path.join(out_dir, n), "wb").write(data)
+    readme_files = {n: d for n, d in files.items() if not n.lower().endswith((".200e", ".210e"))}   # the NVRAM defaults are not EPROMs
+    for n, _sum in DSK_PARTS:
+        readme_files[n] = open(os.path.join(out_dir, n), "rb").read()
+    write_readme(out_dir, readme_files, slapstic, pods, romstack)
+    if romstack:
+        from rdtrack import romstack as rs
+        verbose("romstack: " + ", ".join(rs.write(os.path.join(out_dir, "romstack"), files, COMPACT_MAIN, "rdc-stockcar" + ("-pods" if pods else ""))))
     open(os.path.join(out_dir, "main_image.bin"), "wb").write(bytes(main))
     open(os.path.join(out_dir, "obj_image.bin"), "wb").write(bytes(obj))
     return files, remap
+
+
+ADSP2_SOCKET = {"10h": "9/10H", "10k": "9/10K", "10j": "10H", "10l": "10K", "9h": "9H", "9k": "9K"}
+BOARD = {"r": "main", "s": "main", "t": "main", "u": "main", "v": "main", "w": "main", "x": "main", "y": "main"}
+
+
+def write_readme(out_dir, files, slapstic, pods, romstack):
+    """A README beside the images: which socket each file goes in, by the names on the boards."""
+    import zlib
+    rows = {"main": [], "adsp": [], "dsk": [], "sound": []}
+    for n in sorted(files):
+        if "." not in n:
+            continue
+        ext = n.rsplit(".", 1)[1].lower(); d = files[n]
+        row = (n, "27C010" if len(d) == 0x20000 else "27C256" if len(d) == 0x8000 else "27C512", "%08X" % (zlib.crc32(d) & 0xFFFFFFFF), "%02X" % (sum(d) & 0xFF))
+        if ext in ADSP2_SOCKET:
+            rows["adsp"].append((ADSP2_SOCKET[ext],) + row)
+        elif ext in ("30e", "10e"):
+            rows["dsk"].append((ext.upper(),) + row)
+        elif ext[0] == "2" and ext[-1] in BOARD:
+            rows["main"].append((ext.upper(),) + row)
+        else:
+            rows["sound"].append((ext.upper(),) + row)
+    order = ["9/10H", "10H", "9H", "9/10K", "10K", "9K"]
+    def table(rs):
+        rs = sorted(rs, key=lambda r: (order.index(r[0]) if r[0] in order else 99, r[0]))
+        return "| Socket | File | Type | CRC32 | Byte sum |\n|---|---|---|---|---|\n" + "\n".join("| **%s** | `%s` | %s | `%s` | `%s` |" % r for r in rs) + "\n"
+    chip = {"free": "slapstic **removed**; jumper 200X pin 27 -> 200Y pin 27 and 200X pin 1 -> 200Y pin 1 (one lane is enough: the two Y sockets share those nets), or use ROM stack adapters, which need no jumpers",
+            "115": "slapstic 137412-115 stays in 200K", "117": "slapstic 137412-117 stays in 200K"}[slapstic]
+    text = """# Race Drivin' compact + Stock Car track%s
+
+Built by `rdtrack.stockcar` (--slapstic %s%s%s).  The Autocross slot is the Panorama's Stock Car
+track.  Every file below is the complete set for one board; files that are byte-identical to
+the stock dumps are included so the folder is the whole stack.
+
+## MultiSync main PCB (A046901)
+
+%s
+
+%s
+%s## ADSP II object PCB (A047046)
+
+The socket names are the ones printed on the ADSP II: three per column, `9H`, `9/10H`, `10H`
+and `9K`, `9/10K`, `10K`.  The file extensions are MAME's and come from the older ADSP board,
+so **go by the Socket column**: the `.10h` file goes in 9/10H, the `.10j` file in 10H.  9H and
+9K are empty on a stock compact; on a board from a Panorama they already hold these two chips.
+
+%s
+A mixed or misplaced set here gives BAD POLY BUFF ERROR a few seconds after boot.
+
+## DSK PCB (A047724-01)
+
+Two 27C010s, no jumpers to change.  The self-test's DSK ROM CHECKSUMS screen will show these
+as bad (it sums only the first 64 KB, expecting XX30 / XX31); correct chips read **4F** (30E)
+and **1C** (10E) there.  That failure is expected.
+
+%s
+## Driver sound PCB
+
+All stock compact.  The Panorama's 70N/45N (27C512s) also work: their first half is this program.
+
+%s
+""" % (" + pod stream on Serial B" if pods else "", slapstic, " --pods" if pods else "", " --romstack" if romstack else "",
+       chip, table(rows["main"]),
+       ("\n## ROM stack adapters\n\n`romstack/` holds the two 27C040 lane images (banks R..Y of each lane concatenated).\n\n" if romstack else ""),
+       table(rows["adsp"]), table(rows["dsk"]), table(rows["sound"]))
+    if pods:
+        text += """## Pod stream (Serial B, J3)
+
+The program sends the Panorama side-pod packets (car position, orientation, steering, the cars
+a pod could see, including the other player in a linked race) on Serial B at 38400 8N1.
+Serial A (J2) is untouched, so the machine can still be linked head to head.
+"""
+    open(os.path.join(out_dir, "README.md"), "w").write(text)
 
 
 def relocated_edits(cmain):
@@ -381,13 +467,20 @@ def main(argv=None):
     ap.add_argument("-o", "--out", default="racedrivc_stockcar")
     ap.add_argument("--slapstic", choices=["free", "115", "117"], default="free",
                     help="free: jumper-modified board without the chip; 115/117: the chip stays (same bytes - the program detects which)")
+    ap.add_argument("--pods", action="store_true",
+                    help="also broadcast the Panorama side-pod stream (car position, cars in view) on Serial B / J3, "
+                         "leaving Serial A free for a linked race; see rdtrack/podlink.py")
+    ap.add_argument("--romstack", action="store_true",
+                    help="also write the two 27C040 lane images for the ROM stack adapters (romstack/ in the output)")
     args = ap.parse_args(argv)
+    if args.romstack and args.slapstic != "free":
+        sys.exit("--romstack needs --slapstic free: the ROM stack adapter decodes the Y bank from the address bus, so the slapstic is bypassed whether or not the chip is fitted")
     blobs = load_sources(args.sources)
     missing = [n for n in [x for p in COMPACT_MAIN + COMPACT_OBJ + [COMPACT_DSK] + PAN_MAIN + PAN_OBJ + [PAN_DSK] for x in p] + COMPACT_FILES if n not in blobs]
     if missing:
         sys.exit("missing ROMs: %s" % ", ".join(missing))
     out = os.path.join(args.out, "racedrivc")
-    build_set(blobs, out, args.slapstic)
+    build_set(blobs, out, args.slapstic, pods=args.pods, romstack=args.romstack)
     print("wrote", out)
 
 

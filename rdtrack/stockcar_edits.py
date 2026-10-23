@@ -51,3 +51,16 @@ def _pat(hexs):
     for tok in re.findall(r"\.\.|[0-9a-f]{2}", hexs):
         out += b"." if tok == ".." else re.escape(bytes.fromhex(tok))
     return out
+
+
+def is_free(image):
+    """True when the two `core` edits are already in `image` (a slapstic-free program), False when
+    the stock bytes are there, None when neither is found."""
+    found = []
+    for before, orig, new, after, group, _what in SITES:
+        if group != "core":
+            continue
+        patched = re.search(_pat(before) + _pat(new) + _pat(after), image, re.S) is not None
+        stock = re.search(_pat(before) + _pat(orig) + _pat(after), image, re.S) is not None
+        found.append(True if patched and not stock else False if stock and not patched else None)
+    return None if None in found or len(set(found)) != 1 else found[0]

@@ -263,7 +263,7 @@ class Dsk:
 
 
 def main():
-    src = sys.argv[1] if len(sys.argv) > 1 else "/Users/djb/Developer/Race Drivin/racedriv.zip"
+    src = sys.argv[1] if len(sys.argv) > 1 else "racedriv.zip"
     D = Dsk(load(src))
     bad = D.roundtrip()
     print("round trip: %d structures, %d mismatches %s" % (len(D.spans()), len(bad), bad[:5]))
